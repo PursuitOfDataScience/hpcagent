@@ -1,72 +1,72 @@
-# hpchpcagent
+<div align="center">
 
-**Interactive HPC AI Agent** — a terminal TUI that helps you manage SLURM clusters, diagnose jobs, check nodes and quotas, search docs, and more. Supports 10+ LLM providers.
-
-```text
+```
    ██████╗  █████╗ ██████╗ ██╗     ██╗ ██████╗
    ██╔════╝ ██╔══██╗██╔══██╗██║     ██║██╔════╝
-   ██║  ███╗███████║██████╔╝██║     ██║██║
-   ██║   ██║██╔══██║██╔══██╗██║     ██║██║
+   ██║  ███╗███████║██████╔╝██║     ██║██║     
+   ██║   ██║██╔══██║██╔══██╗██║     ██║██║     
    ╚██████╔╝██║  ██║██║  ██║███████╗██║╚██████╗
    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝
-   ▸ openai:gpt-4o
 ```
+
+### ⚡ Talk to your SLURM cluster in plain English.
+
+An interactive TUI agent that manages SLURM clusters — check nodes, diagnose jobs, predict wait times, fix permissions, search docs, and more. Powered by the LLM of your choice.
+
+[![CI](https://github.com/PursuitOfDataScience/hpcagent/actions/workflows/ci.yml/badge.svg)](https://github.com/PursuitOfDataScience/hpcagent/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](#-license)
+[![Status: beta](https://img.shields.io/badge/status-beta-orange.svg)](#-status)
+
+</div>
+
+---
 
 ## Quickstart
 
 ```bash
-# Install
 pip install "hpchpcagent[full]"
 
-# Launch the TUI
+# OpenAI
 hpchpcagent --backend openai --model gpt-4o --api-key "$OPENAI_API_KEY"
-```
 
-Or with any supported provider:
-
-```bash
+# or Groq (free tier)
 hpchpcagent --backend groq --model mixtral-8x7b-32768
-hpchpcagent --backend deepseek --model deepseek-chat
-hpchpcagent --backend openrouter --model anthropic/claude-sonnet-4
-hpchpcagent --backend custom --api-base-url https://my-llm.example.com/v1 --model my-model
 ```
 
-## Features
+Type your question — "show me all GPU jobs", "why is job 1234 pending?", "check my quota" — and the agent runs SLURM commands, reads docs, or searches the web to answer.
 
-- **Terminal TUI** — streaming responses, thinking animations, markdown rendering, tool call status
-- **SLURM tools** — job status/ETA/extension, node hardware, GPU utilization, quotas, disk usage, permissions, QOS, account management
-- **Provider-agnostic** — openai, groq, openrouter, deepseek, mistral, xai, github, opencode, codex, claude, agy, or any OpenAI-compatible API
-- **Web search & fetch** — DuckDuckGo + trafilatura for external context
-- **Skills system** — load documentation from a `skills.md` file as discoverable tools
+## Supported providers
 
-## Programmatic use
+| Provider | `--backend` | Auth |
+|----------|-------------|------|
+| OpenAI | `openai` | `OPENAI_API_KEY` |
+| Groq | `groq` | `GROQ_API_KEY` |
+| OpenRouter | `openrouter` | `OPENROUTER_API_KEY` |
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
+| Mistral | `mistral` | `MISTRAL_API_KEY` |
+| xAI | `xai` | `XAI_API_KEY` |
+| GitHub Models | `github` | `GITHUB_TOKEN` |
+| OpenCode | `opencode` | `OPENCODE_API_KEY` |
+| Codex CLI | `codex` | _(none — uses `codex` binary)_ |
+| Claude CLI | `claude` | _(none — uses `claude` binary)_ |
+| agy | `agy` | _(none — uses `agy` binary)_ |
+| Any OpenAI-compatible API | `custom` | set `--api-base-url` |
 
-```python
-from hpchpcagent import HPCAgent
-
-agent = HPCAgent(
-    backend="openai",
-    api_key="...",
-    model="gpt-4o",
-    system_prompt="You are an HPC cluster assistant.",
-    docs_base_path="/path/to/user-guide",
-)
-agent.add_doc_tool("read_slurm_docs", "SLURM documentation", "slurm/main.md")
-agent.run()
-```
-
-## Layers
-
-| Layer | Path | Depends on |
-|-------|------|------------|
-| **core** | `hpchpcagent.core` | zero HPC deps |
-| **hpc** | `hpchpcagent.hpc` | core |
-| **agent** | `hpchpcagent.agent` | core + hpc |
-
-## Installation
+## Documentation
 
 ```bash
-pip install hpchpcagent
-pip install "hpchpcagent[full]"    # + web search
-pip install "hpchpcagent[dev]"     # + dev tooling
+# Load a skills file to give the agent access to your cluster docs
+hpchpcagent --backend openai --model gpt-4o --docs-base-path /path/to/docs
+```
+
+Then in the TUI, ask "how do I request GPUs?" and the agent reads the relevant doc.
+
+## Install from source
+
+```bash
+git clone https://github.com/PursuitOfDataScience/hpcagent.git
+cd hpcagent
+pip install -e ".[full]"
+hpchpcagent --backend openai --model gpt-4o
 ```
