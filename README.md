@@ -1,3 +1,15 @@
+<div align="center">
+
+```
+  _   _ _____ _____     ___   _   _ _____ _   _ 
+ | | | |  ___|  ___|   / _ \ | \ | |_   _| \ | |
+ | |_| | |__ | |__    / /_\ \|  \| | | | |  \| |
+ |  _  |  __||  __|   |  _  || . ` | | | | . ` |
+ | | | | |___| |___   | | | || |\  |_| |_| |\  |
+ \_| |_|____/|____/   \_| |_/\_| \_/\___/\_| \_/
+
+</div>
+
 # hpcagent
 
 Talk to your SLURM cluster in plain English. An interactive TUI agent that checks nodes, diagnoses jobs, predicts wait times, fixes permissions, searches docs, and more. Powered by the LLM of your choice.
