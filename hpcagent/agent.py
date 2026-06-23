@@ -2,7 +2,7 @@ import os
 import re
 
 from hpcagent.core.config import JsonConfig
-from hpcagent.core.llm import CLI_BACKENDS, PROVIDER_BASE_URLS, LLMClient
+from hpcagent.core.llm import LLMClient
 from hpcagent.core.tools import ToolRegistry
 from hpcagent.core.ui import (
     c,
@@ -70,12 +70,10 @@ class HPCAgent:
         self.system_prompt_append = kwargs.get("system_prompt_append", "")
         self.banner_lines = kwargs.get("banner_lines", DEFAULT_BANNER)
         self.banner_subtitle = kwargs.get("banner_subtitle", "HPC Agent")
-        self.backend = kwargs.get("backend")
-        if not self.backend:
-            providers = sorted(PROVIDER_BASE_URLS.keys()) + sorted(CLI_BACKENDS)
-            raise ValueError(
-                f"No backend specified. Pass one of: {', '.join(providers)}"
-            )
+        self.backend = kwargs.get("backend", os.environ.get("HPCAGENT_BACKEND", "opencode"))
+        self.model = kwargs.get("model") or os.environ.get("OPENCODE_MODEL", "deepseek-v4-flash-free")
+        self.api_key = kwargs.get("api_key", "")
+        self.api_base_url = kwargs.get("api_base_url", "")
 
         # LLM client — strip keys that LLMClient doesn't expect, pass rest
         llm_skip = {"system_prompt", "system_prompt_append", "banner_lines",
