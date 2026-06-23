@@ -1,0 +1,7 @@
+include CHANGELOG.md
+include LICENSE
+
+recursive-include tests *.py
+recursive-include tests/fixtures *.txt
+
+global-exclude __pycache__ *.py[cod]

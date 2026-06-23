@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hpchpcagent"
+version = "0.1.0"
+description = "Agnostic HPC AI Agent framework — multi-backend LLM, SLURM tools, terminal UI"
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "Youzhi Yu", email = "yuyouzhi666@icloud.com"},
+]
+keywords = ["hpc", "slurm", "sbatch", "llm", "agent", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Distributed Computing",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "prompt_toolkit>=3.0,<4",
+    "requests>=2.31",
+]
+
+[project.urls]
+Homepage = "https://github.com/PursuitOfDataScience/hpchpcagent"
+Repository = "https://github.com/PursuitOfDataScience/hpchpcagent.git"
+Issues = "https://github.com/PursuitOfDataScience/hpchpcagent/issues"
+
+[project.optional-dependencies]
+full = [
+    "ddgs>=0.7",
+    "trafilatura>=1.6",
+    "llama-api-client>=0.8",
+]
+web = ["ddgs>=0.7", "trafilatura>=1.6"]
+llama = ["llama-api-client>=0.8"]
+ui = ["prompt_toolkit>=3.0,<4"]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.10",
+    "pytest-cov>=4.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8",
+    "build>=1.0",
+    "twine>=5.0",
+]
+
+[project.scripts]
+hpchpcagent = "hpchpcagent.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
