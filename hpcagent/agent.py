@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timezone
 
 from hpcagent.core.config import JsonConfig
+from hpcagent.core.docfetch import is_url, load_manifest, mirror_dir_for, mirror_docs
 from hpcagent.core.llm import (
     CLI_BACKENDS,
     PROVIDER_BASE_URLS,
@@ -166,6 +167,8 @@ class HPCAgent:
         self.api_key_source = kwargs.get("api_key_source") or self.config.get("api_key_source") or ""
         self.api_base_url = kwargs.get("api_base_url") or self.config.get("api_base_url") or ""
         self.docs_base_path = kwargs.get("docs_base_path") or self.config.get("docs_base_path") or ""
+        self.docs_url = kwargs.get("docs_url") or self.config.get("docs_url") or ""
+        self.docs_max_pages = kwargs.get("docs_max_pages") or self.config.get("docs_max_pages") or 100
         self.web_base_path = kwargs.get("web_base_path") or self.config.get("web_base_path") or ""
         self.dangerous_bypass = kwargs.get("dangerous_bypass") or self.config.get("dangerous_bypass") or False
         self.reasoning_effort = kwargs.get("effort") or kwargs.get("reasoning_effort") or self.config.get("reasoning_effort") or ""
@@ -720,22 +723,29 @@ class HPCAgent:
                 self.dangerous_bypass = False
                 self.config.set("dangerous_bypass", False)
 
-            # ── Docs path ──────────────────────────────────────────────────
-            if self.docs_base_path:
-                print(f"  {c.YELLOW}Path to your cluster docs (current: {self.docs_base_path}){c.RESET}")
-                print(f"  {c.GRAY}Enter to keep · type a new path · '-' to clear · ESC to go back{c.RESET}")
+            # ── Docs path or URL ───────────────────────────────────────────
+            current_docs = self.docs_url or self.docs_base_path
+            if current_docs:
+                print(f"  {c.YELLOW}Cluster docs — local folder or docs URL (current: {current_docs}){c.RESET}")
+                print(f"  {c.GRAY}Enter to keep · new path/URL · '-' to clear · ESC to go back{c.RESET}")
             else:
-                print(f"  {c.YELLOW}Optional: path to a folder of cluster docs/skills (Enter to skip){c.RESET}")
-                print(f"  {c.GRAY}The agent reads these to answer cluster-specific questions. ESC to go back.{c.RESET}")
+                print(f"  {c.YELLOW}Optional: a local docs folder OR a docs-site URL (Enter to skip){c.RESET}")
+                print(f"  {c.GRAY}A URL is crawled into a local cache the agent reads (re-sync via /docs sync). ESC to go back.{c.RESET}")
             docs = self._read_or_back(f"  {c.CYAN}Docs path\u276f {c.RESET}")
             if docs is None:
                 continue
             if docs == "-":
                 self.docs_base_path = ""
+                self.docs_url = ""
                 self.config.set("docs_base_path", "")
+                self.config.set("docs_url", "")
+            elif is_url(docs):
+                self._mirror_docs_url(docs)
             elif docs:
                 self.docs_base_path = os.path.expanduser(docs)
+                self.docs_url = ""
                 self.config.set("docs_base_path", self.docs_base_path)
+                self.config.set("docs_url", "")
 
             self._init_llm()
             # Auto-load skills if docs path is set
@@ -769,7 +779,10 @@ class HPCAgent:
         print(f"\n  {c.GREEN}{c.BOLD}Setup complete!{c.RESET}")
         print(f"    {c.GRAY}Provider:{c.RESET} {self.backend}")
         print(f"    {c.GRAY}Model:{c.RESET}    {self.model or '(provider default)'}")
-        print(f"    {c.GRAY}Docs:{c.RESET}     {self.docs_base_path or '(none)'}")
+        docs_label = self.docs_url or self.docs_base_path or "(none)"
+        if self.docs_url:
+            docs_label += " (mirrored locally)"
+        print(f"    {c.GRAY}Docs:{c.RESET}     {docs_label}")
         print(f"    {c.GRAY}API key:{c.RESET}  {key_label}")
         print(f"\n  {c.GRAY}Try asking:{c.RESET}")
         print(f"    {c.CYAN}• why is job 1234 pending?{c.RESET}")
@@ -1019,20 +1032,53 @@ class HPCAgent:
                         continue
 
                     elif cmd == '/docs':
+                        subcmd = args_str.strip().lower()
+                        if subcmd.startswith('sync'):
+                            if not self.docs_url:
+                                print(f"  {c.YELLOW}No docs URL configured. Add one via /config (Docs step) to enable sync.{c.RESET}")
+                            elif self._mirror_docs_url(self.docs_url):
+                                print(f"  {c.GREEN}Docs re-synced from {self.docs_url}.{c.RESET}")
+                            continue
+                        if subcmd in ('add', 'set'):
+                            print(f"  {c.YELLOW}Enter a local docs folder or a docs-site URL:{c.RESET}")
+                            val = self._read_or_back(f"  {c.CYAN}Docs path/URL❯ {c.RESET}")
+                            if val:
+                                if is_url(val):
+                                    self._mirror_docs_url(val)
+                                else:
+                                    self.docs_base_path = os.path.expanduser(val)
+                                    self.docs_url = ""
+                                    self.config.set("docs_base_path", self.docs_base_path)
+                                    self.config.set("docs_url", "")
+                                    self._load_all_configured_skills()
+                                    print(f"  {c.GREEN}Docs path set to {self.docs_base_path}.{c.RESET}")
+                            continue
+
+                        if self.docs_url:
+                            mani = load_manifest(mirror_dir_for(self.docs_url))
+                            print(f"\n  {c.BOLD}{c.CYAN}Docs source (mirrored from URL):{c.RESET}")
+                            print(f"    {c.GRAY}URL:{c.RESET}     {self.docs_url}")
+                            print(f"    {c.GRAY}Cache:{c.RESET}   {self.docs_base_path}")
+                            if mani:
+                                print(f"    {c.GRAY}Pages:{c.RESET}   {mani.get('page_count', '?')}")
+                                print(f"    {c.GRAY}Fetched:{c.RESET} {mani.get('fetched_at', '?')}")
+                            print(f"    {c.GRAY}Run {c.PINK}/docs sync{c.GRAY} to refresh.{c.RESET}")
+                        elif self.docs_base_path:
+                            print(f"\n  {c.BOLD}{c.CYAN}Docs source (local):{c.RESET} {c.GRAY}{self.docs_base_path}{c.RESET}")
+
                         if not self.doc_paths and not self.web_doc_paths:
-                            print(f"  {c.YELLOW}No documentation pages or skills loaded.{c.RESET}")
-                            if self.docs_base_path:
-                                print(f"  {c.GRAY}Docs base path: {self.docs_base_path}{c.RESET}")
+                            print(f"  {c.YELLOW}No documentation pages or skills loaded yet.{c.RESET}")
+                            print(f"  {c.GRAY}Add docs with {c.PINK}/docs add{c.GRAY} (local folder or URL).{c.RESET}")
                         else:
                             if self.doc_paths:
-                                print(f"\n  {c.BOLD}{c.PINK}Loaded Documentation/Skills (Local):{c.RESET}\n")
+                                print(f"\n  {c.BOLD}{c.CYAN}Loaded doc pages ({len(self.doc_paths)}):{c.RESET}\n")
                                 for name, path in sorted(self.doc_paths.items()):
-                                    print(f"    * {c.CYAN}{name:<25}{c.RESET} -> {c.GRAY}{path}{c.RESET}")
+                                    print(f"    * {c.CYAN}{name:<28}{c.RESET} {c.GRAY}{path}{c.RESET}")
                             if self.web_doc_paths:
-                                print(f"\n  {c.BOLD}{c.PINK}Loaded Documentation/Skills (Web):{c.RESET}\n")
+                                print(f"\n  {c.BOLD}{c.CYAN}Loaded doc pages (web):{c.RESET}\n")
                                 for name, path in sorted(self.web_doc_paths.items()):
-                                    print(f"    * {c.CYAN}{name:<25}{c.RESET} -> {c.GRAY}{path}{c.RESET}")
-                            print()
+                                    print(f"    * {c.CYAN}{name:<28}{c.RESET} {c.GRAY}{path}{c.RESET}")
+                        print()
                         continue
 
                     elif cmd == '/keys':
@@ -1166,6 +1212,34 @@ class HPCAgent:
                     {"type": "object", "properties": {}, "required": []},
                     lambda a, n=name: self._execute_doc_tool(n, a),
                 )
+
+    def _mirror_docs_url(self, url: str, *, reload: bool = True) -> bool:
+        """Crawl a docs-site URL into a local markdown cache and register it.
+
+        Sets docs_url + docs_base_path (to the cache dir) and persists them so the
+        mirror can be re-synced later with /docs sync.
+        """
+        dest = mirror_dir_for(url)
+
+        def _progress(i, total, page_url):
+            short = page_url if len(page_url) <= 68 else page_url[:65] + "..."
+            print(f"\r{c.GRAY}Mirroring docs [{i}/{total}] {short}\033[K{c.RESET}", end="", flush=True)
+
+        print(f"  {c.GRAY}Discovering and mirroring pages from {url} ...{c.RESET}")
+        try:
+            manifest = mirror_docs(url, dest, max_pages=int(self.docs_max_pages), progress=_progress)
+        except Exception as e:
+            print(f"\r\033[K  {c.RED}Could not mirror docs: {e}{c.RESET}")
+            return False
+
+        print(f"\r\033[K  {c.GREEN}Mirrored {manifest['page_count']} page(s) to {dest}{c.RESET}")
+        self.docs_url = url
+        self.docs_base_path = dest
+        self.config.set("docs_url", url)
+        self.config.set("docs_base_path", dest)
+        if reload:
+            self._load_all_configured_skills()
+        return True
 
     def _load_all_configured_skills(self):
         if not self.docs_base_path:

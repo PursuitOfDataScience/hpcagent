@@ -25,6 +25,8 @@ def main():
     parser.add_argument("--system-prompt", default=None, help="Path to system prompt file")
     parser.add_argument("--system-prompt-append", default=None, help="Appended system prompt text")
     parser.add_argument("--docs-base-path", default=None, help="Base path for doc tools")
+    parser.add_argument("--docs-url", default=None,
+                        help="Docs-site URL to mirror into a local cache the agent can read")
     parser.add_argument("--version", action="store_true", help="Show version and exit")
     parser.add_argument("--list-models", default=None, nargs="?", const="opencode",
                         help="List available models for a provider (default: opencode)")
@@ -75,7 +77,7 @@ def main():
 
     kwargs = {}
     for key in ("backend", "api_key", "api_base_url", "model", "docs_base_path",
-                "system_prompt_append", "config_path", "dangerous_bypass", "effort"):
+                "docs_url", "system_prompt_append", "config_path", "dangerous_bypass", "effort"):
         val = getattr(args, key.replace("-", "_"), None)
         if val is not None:
             kwargs[key] = val
@@ -88,6 +90,17 @@ def main():
             sys.exit(1)
 
     agent = HPCAgent(**kwargs)
+
+    # A --docs-url was passed: use the existing mirror if present, else build it.
+    if args.docs_url:
+        from hpcagent.core.docfetch import load_manifest, mirror_dir_for
+        dest = mirror_dir_for(args.docs_url)
+        if load_manifest(dest):
+            agent.docs_url = args.docs_url
+            agent.docs_base_path = dest
+            agent._load_all_configured_skills()
+        else:
+            agent._mirror_docs_url(args.docs_url)
 
     # Auto-load skills from docs base path
     if agent.docs_base_path:

@@ -53,7 +53,7 @@ SLASH_MENU = [
     ('/retry',   '/retry',   'Retry the last user prompt',    ('/retry',)),
     ('/copy',    '/copy',    'Copy the last response',        ('/copy',)),
     ('/save',    '/save',    'Save chat transcript to file',  ('/save',)),
-    ('/docs',    '/docs',    'List loaded documentation',     ('/docs',)),
+    ('/docs',    '/docs',    'Show/add/sync docs (local or URL)', ('/docs',)),
     ('/keys',    '/keys',    'Show key sources and status',   ('/keys',)),
     ('/version', '/version', 'Show version information',      ('/version',)),
     ('/exit',    '/exit, /quit', 'Exit the agent',            ('/exit', '/quit')),

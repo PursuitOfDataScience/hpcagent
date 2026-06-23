@@ -58,12 +58,22 @@ Type your question — "show me all GPU jobs", "why is job 1234 pending?", "chec
 
 ## Documentation
 
+Point the agent at your cluster docs — either a **local folder** of markdown, or a
+**docs-site URL** (a whole user guide). A URL is crawled once into a local cache
+(sitemap first, then a focused crawl) so the agent reads it instantly and offline:
+
 ```bash
-# Load a skills file to give the agent access to your cluster docs
+# Local folder of docs/skills
 hpcagent --backend openai --model gpt-4o --docs-base-path /path/to/docs
+
+# Or mirror an online user guide into a local cache
+hpcagent --backend openai --model gpt-4o --docs-url https://docs.your-cluster.edu/user-guide/
 ```
 
-Then in the TUI, ask "how do I request GPUs?" and the agent reads the relevant doc.
+You can also set this in the setup wizard's *Docs* step (paste a path or a URL).
+In the TUI, `/docs` shows what's loaded, `/docs add` adds a source, and `/docs sync`
+re-crawls the URL when the docs change. Then ask "how do I request GPUs?" and the
+agent reads the relevant page. (Requires the `full` extra for `trafilatura`.)
 
 ## Install from source
 
