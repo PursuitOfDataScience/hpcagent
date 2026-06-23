@@ -1,11 +1,12 @@
 <div align="center">
 
 ```
-H   H PPPP   CCC          A    GGG  EEEEE N   N TTTTT
-H   H P   P C   C        A A  G     E     NN  N   T  
-HHHHH PPPP  C           AAAAA G GG  EEEE  N N N   T  
-H   H P     C   C       A   A G   G E     N  NN   T  
-H   H P      CCC        A   A  GGG  EEEEE N   N   T  
+██╗  ██╗██████╗  ██████╗     █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+██║  ██║██╔══██╗██╔════╝    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+███████║██████╔╝██║         ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   
+██╔══██║██╔═══╝ ██║         ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   
+██║  ██║██║     ╚██████╗    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   
+╚═╝  ╚═╝╚═╝      ╚═════╝    ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   
 ```
 
 </div>
@@ -37,20 +38,23 @@ Type your question — "show me all GPU jobs", "why is job 1234 pending?", "chec
 
 ## Supported providers
 
-| Provider | `--backend` | Auth |
-|----------|-------------|------|
-| OpenAI | `openai` | `OPENAI_API_KEY` |
-| Groq | `groq` | `GROQ_API_KEY` |
-| OpenRouter | `openrouter` | `OPENROUTER_API_KEY` |
-| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
-| Mistral | `mistral` | `MISTRAL_API_KEY` |
-| xAI | `xai` | `XAI_API_KEY` |
-| GitHub Models | `github` | `GITHUB_TOKEN` |
-| OpenCode | `opencode` | `OPENCODE_API_KEY` |
-| Codex CLI | `codex` | _(none — uses `codex` binary)_ |
-| Claude CLI | `claude` | _(none — uses `claude` binary)_ |
-| agy | `agy` | _(none — uses `agy` binary)_ |
-| Any OpenAI-compatible API | `custom` | set `--api-base-url` |
+| Provider | `--backend` | Auth | Type |
+|----------|-------------|------|------|
+| OpenAI | `openai` | `OPENAI_API_KEY` | API (Curated Tools) |
+| Groq | `groq` | `GROQ_API_KEY` | API (Curated Tools) |
+| OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | API (Curated Tools) |
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` | API (Curated Tools) |
+| Mistral | `mistral` | `MISTRAL_API_KEY` | API (Curated Tools) |
+| xAI | `xai` | `XAI_API_KEY` | API (Curated Tools) |
+| GitHub Models | `github` | `GITHUB_TOKEN` | API (Curated Tools) |
+| OpenCode | `opencode` | `OPENCODE_API_KEY` | API (Curated Tools) |
+| Any OpenAI-compatible API | `custom` | set `--api-base-url` | API (Curated Tools) |
+| Codex CLI | `codex` | _(uses `codex` binary)_ | CLI (Bring-your-own-tools) |
+| Claude CLI | `claude` | _(uses `claude` binary)_ | CLI (Bring-your-own-tools) |
+| agy | `agy` | _(uses `agy` binary)_ | CLI (Bring-your-own-tools) |
+
+> [!NOTE]
+> **API vs. CLI backends:** API backends use the python-based curated HPC tools registered in `hpcagent` (e.g. permission checks, job wait time estimates, custom quotas). CLI backends run external CLI binaries directly, executing bash commands and using their own tool systems without the python-based custom wrappers.
 
 ## Documentation
 

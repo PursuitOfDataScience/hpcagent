@@ -1,17 +1,27 @@
+from collections.abc import Callable
+from enum import Enum
+
+
+class ToolRisk(Enum):
+    READ_ONLY = "read-only"
+    MUTATING = "mutating"
+    DESTRUCTIVE = "destructive"
 
 
 class ToolRegistry:
-    """Register named tools with JSON schemas and handler functions, then dispatch."""
+    """Register named tools with JSON schemas, risk levels, and handler functions, then dispatch."""
 
     def __init__(self):
         self._tools = {}
         self._handlers = {}
 
-    def register(self, name: str, description: str, input_schema: dict, handler: callable):
+    def register(self, name: str, description: str, input_schema: dict,
+                 handler: Callable, risk: ToolRisk = ToolRisk.READ_ONLY):
         self._tools[name] = {
             "name": name,
             "description": description,
             "input_schema": input_schema,
+            "risk": risk,
         }
         self._handlers[name] = handler
 
@@ -35,19 +45,14 @@ class ToolRegistry:
             })
         return result
 
-    def get_llama_tools(self) -> list:
-        result = []
-        for t in self._tools.values():
-            result.append({
-                "type": "function",
-                "function": {
-                    "name": t["name"],
-                    "description": t["description"],
-                    "strict": True,
-                    "parameters": t["input_schema"],
-                },
-            })
-        return result
+    def get_risk(self, name: str) -> ToolRisk:
+        tool = self._tools.get(name)
+        if tool:
+            return tool.get("risk", ToolRisk.READ_ONLY)
+        return ToolRisk.READ_ONLY
+
+    def get_names(self) -> set:
+        return set(self._tools.keys())
 
     def has(self, name: str) -> bool:
         return name in self._tools

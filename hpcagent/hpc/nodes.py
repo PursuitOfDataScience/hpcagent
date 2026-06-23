@@ -74,10 +74,13 @@ def merge_node_hardware(base: dict, incoming: dict) -> None:
             base["sources"].append(source)
 
 
+_SUBPROCESS_TIMEOUT = 30
+
+
 def collect_node_info_from_sinfo(node_name: str) -> tuple:
     command = ["sinfo", "-h", "-N", "-n", node_name, "-o", "%N|%P|%t|%c|%m|%f|%G"]
     try:
-        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT, timeout=_SUBPROCESS_TIMEOUT)
     except FileNotFoundError:
         return None, "sinfo command not found."
     except subprocess.CalledProcessError as e:
@@ -119,7 +122,7 @@ def collect_node_info_from_sinfo(node_name: str) -> tuple:
 def collect_node_info_from_scontrol(node_name: str) -> tuple:
     command = ["scontrol", "show", "node", node_name, "-o"]
     try:
-        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT, timeout=_SUBPROCESS_TIMEOUT)
     except FileNotFoundError:
         return None, "scontrol command not found."
     except subprocess.CalledProcessError as e:
@@ -172,7 +175,7 @@ def collect_node_info_from_scontrol(node_name: str) -> tuple:
     return info, ""
 
 
-def collect_node_info_from_snapshot_db(node_name: str, db_path: str = None) -> tuple:
+def collect_node_info_from_snapshot_db(node_name: str, db_path: str | None = None) -> tuple:
     if db_path is None:
         db_path = NODE_MONITOR_DB_DEFAULT_PATH
     db_path = os.path.expanduser(db_path)
@@ -220,7 +223,7 @@ def collect_node_info_from_snapshot_db(node_name: str, db_path: str = None) -> t
     return info, ""
 
 
-def resolve_node_hardware(node_name: str, db_path: str = None) -> dict:
+def resolve_node_hardware(node_name: str, db_path: str | None = None) -> dict:
     clean_name = normalize_null(node_name)
     payload = new_node_hardware_payload(clean_name)
     if not clean_name:
@@ -305,7 +308,7 @@ def format_node_hardware_summary(payload: dict) -> str:
     return "\n".join(lines)
 
 
-def check_node_hardware(node_name: str, db_path: str = None) -> str:
+def check_node_hardware(node_name: str, db_path: str | None = None) -> str:
     payload = resolve_node_hardware(node_name, db_path=db_path)
     if not payload.get("has_data"):
         details = "; ".join(payload.get("errors", []))
@@ -337,7 +340,7 @@ def fetch_scontrol_node_metrics(node_names: set) -> tuple:
         return {}, True, "no nodes requested"
     command = ["scontrol", "show", "node", "-o"]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=_SUBPROCESS_TIMEOUT)
     except FileNotFoundError:
         return {}, False, "scontrol command not found."
     if result.returncode != 0:
@@ -387,7 +390,7 @@ def fetch_cluster_nodes(partitions: list, use_scontrol: bool = True) -> tuple:
     if partitions:
         command.extend(["-p", ",".join(partitions)])
     try:
-        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output(command, text=True, stderr=subprocess.STDOUT, timeout=_SUBPROCESS_TIMEOUT)
     except FileNotFoundError:
         raise RuntimeError("sinfo command not found.")
     except subprocess.CalledProcessError as e:
@@ -608,7 +611,7 @@ def summarize_partition_breakdown(nodes: list) -> list:
     return rows
 
 
-def check_cluster_snapshot_summary(partition: str = None, include_partition_breakdown: bool = True, use_scontrol: bool = True) -> str:
+def check_cluster_snapshot_summary(partition: str | None = None, include_partition_breakdown: bool = True, use_scontrol: bool = True) -> str:
     if isinstance(partition, list):
         scope = [item for item in [normalize_null(p) for p in partition] if item]
     else:
@@ -673,7 +676,7 @@ def format_top_gpu_nodes(rows: list, scope: list, command: str, scontrol_ok: boo
     return "\n".join(lines).strip()
 
 
-def check_top_gpu_utilized_nodes(partition: str = None, limit: int = 30, use_scontrol: bool = True) -> str:
+def check_top_gpu_utilized_nodes(partition: str | None = None, limit: int = 30, use_scontrol: bool = True) -> str:
     if isinstance(partition, list):
         scope = [item for item in [normalize_null(p) for p in partition] if item]
     else:

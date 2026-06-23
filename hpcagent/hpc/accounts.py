@@ -1,11 +1,25 @@
 import re
+import shutil
 from collections import Counter
 
 from hpcagent.hpc.slurm import is_fatal_command_error, run_cli_command
 
+# Configuration variables injected from self.config at runtime
+ACCOUNT_PREFIX = "pi-"
+SHARED_PARTITION = "shared"
+QUOTA_COMMAND = "quota"
+ACCOUNTS_COMMAND = "accounts"
+RCCHELP_COMMAND = "rcchelp"
+
+
+def _has_command(cmd_name: str) -> bool:
+    return bool(shutil.which(cmd_name))
+
 
 def check_user_quota(user_id: str) -> str:
-    cmd = ["quota", "-u", user_id]
+    if not _has_command(QUOTA_COMMAND):
+        return f"Quota query tool is unavailable: '{QUOTA_COMMAND}' command not found on this cluster."
+    cmd = [QUOTA_COMMAND, "-u", user_id]
     ok, output = run_cli_command(cmd, timeout=20)
     if not ok:
         return f"Error checking quota for {user_id}: {output}"
@@ -20,14 +34,23 @@ def check_user_jobs(user_id: str) -> str:
     return output if output else f"No jobs found for user {user_id}"
 
 
-def check_pi_balance(account_name: str) -> str:
+def _get_account_candidates(account_name: str) -> list:
     candidates = [account_name]
-    if account_name.startswith("pi-"):
-        candidates.append(account_name[3:])
-    else:
-        candidates.insert(0, f"pi-{account_name}")
+    prefix = ACCOUNT_PREFIX
+    if prefix:
+        if account_name.startswith(prefix):
+            candidates.append(account_name[len(prefix):])
+        else:
+            candidates.insert(0, f"{prefix}{account_name}")
+    return candidates
+
+
+def check_pi_balance(account_name: str) -> str:
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Account balance tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    candidates = _get_account_candidates(account_name)
     for name in candidates:
-        cmd = ["accounts", "balance", "-a", name]
+        cmd = [ACCOUNTS_COMMAND, "balance", "-a", name]
         ok, output = run_cli_command(cmd, timeout=25)
         if ok:
             if "doesn't exist" not in output.lower() and "no such account" not in output.lower():
@@ -40,13 +63,11 @@ def check_pi_balance(account_name: str) -> str:
 
 
 def check_pi_allocations(account_name: str) -> str:
-    candidates = [account_name]
-    if account_name.startswith("pi-"):
-        candidates.append(account_name[3:])
-    else:
-        candidates.insert(0, f"pi-{account_name}")
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Allocations tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    candidates = _get_account_candidates(account_name)
     for name in candidates:
-        cmd = ["accounts", "allocations", "-a", name]
+        cmd = [ACCOUNTS_COMMAND, "allocations", "-a", name]
         ok, output = run_cli_command(cmd, timeout=25)
         if ok:
             if "doesn't exist" not in output.lower() and "no such account" not in output.lower():
@@ -59,13 +80,11 @@ def check_pi_allocations(account_name: str) -> str:
 
 
 def check_pi_storage(account_name: str) -> str:
-    candidates = [account_name]
-    if account_name.startswith("pi-"):
-        candidates.append(account_name[3:])
-    else:
-        candidates.insert(0, f"pi-{account_name}")
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Storage allocations tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    candidates = _get_account_candidates(account_name)
     for name in candidates:
-        cmd = ["accounts", "storage", "-a", name]
+        cmd = [ACCOUNTS_COMMAND, "storage", "-a", name]
         ok, output = run_cli_command(cmd, timeout=25)
         if ok:
             if "doesn't exist" not in output.lower() and "no such account" not in output.lower():
@@ -77,8 +96,10 @@ def check_pi_storage(account_name: str) -> str:
     return f"Could not find storage allocations for {account_name}"
 
 
-def list_user_accounts(user_id: str = None) -> str:
-    cmd = ["accounts", "list"]
+def list_user_accounts(user_id: str | None = None) -> str:
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Account list tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    cmd = [ACCOUNTS_COMMAND, "list"]
     if user_id:
         cmd.extend(["-u", user_id])
     ok, output = run_cli_command(cmd, timeout=25)
@@ -88,13 +109,11 @@ def list_user_accounts(user_id: str = None) -> str:
 
 
 def check_account_members(account_name: str) -> str:
-    candidates = [account_name]
-    if account_name.startswith("pi-"):
-        candidates.append(account_name[3:])
-    else:
-        candidates.insert(0, f"pi-{account_name}")
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Account members tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    candidates = _get_account_candidates(account_name)
     for name in candidates:
-        cmd = ["accounts", "members", "-a", name]
+        cmd = [ACCOUNTS_COMMAND, "members", "-a", name]
         ok, output = run_cli_command(cmd, timeout=25)
         if ok:
             if "doesn't exist" not in output.lower() and "no such account" not in output.lower():
@@ -106,10 +125,15 @@ def check_account_members(account_name: str) -> str:
     return f"Could not find members for {account_name}"
 
 
-def check_su_usage(account_name: str = None, user_id: str = None, partition: str = None) -> str:
-    cmd = ["accounts", "usage"]
+def check_su_usage(account_name: str | None = None, user_id: str | None = None, partition: str | None = None) -> str:
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"SU usage tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    cmd = [ACCOUNTS_COMMAND, "usage"]
     if account_name:
-        name = account_name if account_name.startswith("pi-") else f"pi-{account_name}"
+        prefix = ACCOUNT_PREFIX
+        name = account_name
+        if prefix and not account_name.startswith(prefix):
+            name = f"{prefix}{account_name}"
         cmd.extend(["-a", name])
     if user_id:
         cmd.extend(["-u", user_id])
@@ -121,8 +145,10 @@ def check_su_usage(account_name: str = None, user_id: str = None, partition: str
     return output if output else "No usage data found"
 
 
-def check_qos_info(partition: str = None) -> str:
-    cmd = ["accounts", "qos"]
+def check_qos_info(partition: str | None = None) -> str:
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"QOS tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    cmd = [ACCOUNTS_COMMAND, "qos"]
     if partition:
         cmd.extend(["-q", partition])
     ok, output = run_cli_command(cmd, timeout=25)
@@ -131,10 +157,15 @@ def check_qos_info(partition: str = None) -> str:
     return output if output else "No QOS information found"
 
 
-def check_recent_jobs(account_name: str = None, user_id: str = None) -> str:
-    cmd = ["accounts", "jobs"]
+def check_recent_jobs(account_name: str | None = None, user_id: str | None = None) -> str:
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Job records tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    cmd = [ACCOUNTS_COMMAND, "jobs"]
     if account_name:
-        name = account_name if account_name.startswith("pi-") else f"pi-{account_name}"
+        prefix = ACCOUNT_PREFIX
+        name = account_name
+        if prefix and not account_name.startswith(prefix):
+            name = f"{prefix}{account_name}"
         cmd.extend(["-a", name])
     if user_id:
         cmd.extend(["-u", user_id])
@@ -145,19 +176,27 @@ def check_recent_jobs(account_name: str = None, user_id: str = None) -> str:
 
 
 def check_low_balance_accounts() -> str:
-    cmd = ["accounts", "checkbalance"]
+    if not _has_command(ACCOUNTS_COMMAND):
+        return f"Balance checking tool is unavailable: '{ACCOUNTS_COMMAND}' command not found on this cluster."
+    cmd = [ACCOUNTS_COMMAND, "checkbalance"]
     ok, output = run_cli_command(cmd, timeout=25)
     if not ok:
         return f"Error checking balances: {output}"
     return output if output else "No low balance accounts found"
 
 
-def get_partition_info(partition: str = None) -> str:
+def get_partition_info(partition: str | None = None) -> str:
     if partition:
-        if partition.lower() == "shared":
-            cmd = ["rcchelp", "sinfo", "shared"]
+        if SHARED_PARTITION and partition.lower() == SHARED_PARTITION.lower():
+            if _has_command(RCCHELP_COMMAND):
+                cmd = [RCCHELP_COMMAND, "sinfo", SHARED_PARTITION]
+            else:
+                cmd = ["sinfo", "-p", SHARED_PARTITION]
         else:
-            cmd = ["rcchelp", "sinfo", "-p", partition]
+            if _has_command(RCCHELP_COMMAND):
+                cmd = [RCCHELP_COMMAND, "sinfo", "-p", partition]
+            else:
+                cmd = ["sinfo", "-p", partition]
     else:
         cmd = ["sinfo", "-o", "%P %a %l %D %T %N"]
     ok, output = run_cli_command(cmd, timeout=25)
@@ -167,25 +206,23 @@ def get_partition_info(partition: str = None) -> str:
 
 
 def check_jobs_by_partition(partition: str) -> str:
-    cmd = ["squeue", "-p", partition]
+    cmd = ["squeue", "-h", "-p", partition, "-o", "%T"]
     ok, output = run_cli_command(cmd, timeout=20)
     if not ok:
         return f"Error checking jobs in partition {partition}: {output}"
     if output:
-        lines_list = output.split('\n')
-        running = sum(1 for line in lines_list[1:] if ' R ' in line)
-        pending = sum(1 for line in lines_list[1:] if ' PD ' in line)
+        states = [line.strip() for line in output.splitlines() if line.strip()]
+        running = sum(1 for s in states if s == "RUNNING" or s == "R")
+        pending = sum(1 for s in states if s == "PENDING" or s == "PD")
         summary = f"Summary: {running} running, {pending} pending jobs in partition '{partition}'\n\n"
-        return summary + output
+        cmd_full = ["squeue", "-p", partition]
+        ok_full, output_full = run_cli_command(cmd_full, timeout=20)
+        return summary + (output_full if ok_full else output)
     return f"No jobs found in partition {partition}"
 
 
-def check_account_jobs(account_name: str, partition: str = None) -> str:
-    candidates = [account_name]
-    if account_name.startswith("pi-"):
-        candidates.append(account_name[3:])
-    else:
-        candidates.insert(0, f"pi-{account_name}")
+def check_account_jobs(account_name: str, partition: str | None = None) -> str:
+    candidates = _get_account_candidates(account_name)
     seen = set()
     ordered_candidates = []
     for candidate in candidates:
@@ -204,10 +241,10 @@ def check_account_jobs(account_name: str, partition: str = None) -> str:
             last_ok_name = name
             if output.strip():
                 rows = []
-                state_counts = Counter()
-                user_counts = Counter()
-                pending_reason_counts = Counter()
-                unavailable_node_counts = Counter()
+                state_counts: Counter[str] = Counter()
+                user_counts: Counter[str] = Counter()
+                pending_reason_counts: Counter[str] = Counter()
+                unavailable_node_counts: Counter[str] = Counter()
                 stuck_jobs = []
                 for raw_line in output.splitlines():
                     if not raw_line.strip():
@@ -276,14 +313,20 @@ def check_account_jobs(account_name: str, partition: str = None) -> str:
 def check_jobs_by_node(node_name: str) -> str:
     from hpcagent.hpc.nodes import check_node_hardware
     hardware_summary = check_node_hardware(node_name)
+    count_cmd = ["squeue", "-h", "-w", node_name, "-o", "%i"]
+    ok_count, out_count = run_cli_command(count_cmd, timeout=20)
+
     cmd = ["squeue", "-w", node_name]
     ok, output = run_cli_command(cmd, timeout=20)
     if not ok:
         error_msg = f"Error checking jobs on node {node_name}: {output}"
         return error_msg + f"\n\nNode hardware details:\n{hardware_summary}"
+
+    job_count = 0
+    if ok_count and out_count:
+        job_count = len([line for line in out_count.splitlines() if line.strip()])
+
     if output:
-        lines_list = output.split('\n')
-        job_count = len(lines_list) - 1 if len(lines_list) > 1 else 0
         summary = f"Summary: {job_count} jobs running on node '{node_name}'\n\n"
         return summary + output + f"\n\nNode hardware details:\n{hardware_summary}"
     return f"No jobs found on node {node_name}\n\nNode hardware details:\n{hardware_summary}"

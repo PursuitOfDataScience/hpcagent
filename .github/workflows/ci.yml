@@ -31,7 +31,7 @@ jobs:
         run: ruff check hpcagent/
 
       - name: Type check with mypy
-        run: mypy hpcagent/ || true
+        run: mypy hpcagent/
 
       - name: Test with pytest
-        run: python -m pytest --cov=hpcagent || echo "No tests yet"
+        run: python -m pytest --cov=hpcagent

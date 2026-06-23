@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+from typing import Any
 
 
 def parse_size_to_bytes(size_str: str) -> int:
@@ -17,7 +18,7 @@ def parse_size_to_bytes(size_str: str) -> int:
     return int(number * multipliers.get(unit, 1))
 
 
-def analyze_disk_usage(directory: str = None, max_depth: int = 1) -> str:
+def analyze_disk_usage(directory: str | None = None, max_depth: int = 1) -> str:
     if not directory:
         directory = os.path.expanduser("~")
     directory = os.path.expanduser(directory)
@@ -30,7 +31,7 @@ def analyze_disk_usage(directory: str = None, max_depth: int = 1) -> str:
     try:
         output = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, timeout=60)
         lines = output.strip().split('\n')
-        parsed_items = []
+        parsed_items: list[dict[str, Any]] = []
         for line in lines:
             parts = line.split('\t')
             if len(parts) == 2:

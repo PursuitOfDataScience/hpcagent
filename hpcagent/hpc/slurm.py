@@ -24,7 +24,7 @@ BUSY_NODE_STATES = {"alloc", "mix", "comp", "drng", "drain", "resv", "maint"}
 UNAVAILABLE_NODE_STATES = {"down", "drain", "drng", "maint", "fail", "unknown", "pow_up", "reboot"}
 
 
-def normalize_null(text: str) -> str:
+def normalize_null(text: str | None) -> str:
     if text is None:
         return ""
     value = str(text).strip()
@@ -35,7 +35,7 @@ def normalize_null(text: str) -> str:
     return value
 
 
-def split_csv(text: str) -> list:
+def split_csv(text: str | None) -> list[str]:
     return [item.strip() for item in normalize_null(text).split(",") if item.strip()]
 
 

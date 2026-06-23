@@ -1,19 +1,23 @@
+import os
 import re
 import select
 import shutil
 import sys
 import threading
 import time
+from typing import Any
 
 PTK_AVAILABLE = False
 try:
     from prompt_toolkit.application import Application
     from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
     from prompt_toolkit.enums import EditingMode
-    from prompt_toolkit.history import InMemoryHistory
+    from prompt_toolkit.filters import Condition
+    from prompt_toolkit.history import FileHistory
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.layout import Layout
-    from prompt_toolkit.layout.containers import HSplit
+    from prompt_toolkit.layout.containers import ConditionalContainer, HSplit, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
     from prompt_toolkit.styles import Style
     from prompt_toolkit.widgets import Frame, TextArea
     PTK_AVAILABLE = True
@@ -21,8 +25,68 @@ except ImportError:
     pass
 
 
-HISTORY = InMemoryHistory() if PTK_AVAILABLE else None
+HISTORY: Any = None
 
+if PTK_AVAILABLE:
+    history_path = os.path.expanduser("~/.local/state/hpcagent/history")
+    try:
+        os.makedirs(os.path.dirname(history_path), exist_ok=True)
+        HISTORY = FileHistory(history_path)
+    except Exception:
+        # Fallback to InMemoryHistory if we can't write to history_path
+        from prompt_toolkit.history import InMemoryHistory
+        HISTORY = InMemoryHistory()
+else:
+    HISTORY = None
+
+_INPUT_GO_BACK = object()
+
+SLASH_MENU = [
+    ('/help',    '/help',    'Show help about commands',      ('/help',)),
+    ('/config',  '/config',  'Reconfigure backend/API key',   ('/config',)),
+    ('/backend', '/backend', 'Select a different provider',   ('/backend',)),
+    ('/model',   '/model',   'Select a different model',      ('/model',)),
+    ('/models',  '/models',  'List available models',         ('/models',)),
+    ('/effort',  '/effort',  'Set reasoning effort level',    ('/effort',)),
+    ('/tools',   '/tools',   'List registered HPC tools',     ('/tools',)),
+    ('/clear',   '/clear',   'Clear conversation history',    ('/clear', '/new')),
+    ('/new',     '/new',     'Start a new conversation',      ('/new', '/clear')),
+    ('/retry',   '/retry',   'Retry the last user prompt',    ('/retry',)),
+    ('/copy',    '/copy',    'Copy the last response',        ('/copy',)),
+    ('/save',    '/save',    'Save chat transcript to file',  ('/save',)),
+    ('/docs',    '/docs',    'List loaded documentation',     ('/docs',)),
+    ('/keys',    '/keys',    'Show key sources and status',   ('/keys',)),
+    ('/version', '/version', 'Show version information',      ('/version',)),
+    ('/exit',    '/exit, /quit', 'Exit the agent',            ('/exit', '/quit')),
+]
+SLASH_COLORS = {
+    '/help': '#00ff80', '/config': '#ffaa00', '/backend': '#00aaff',
+    '/model': '#ff00ff', '/models': '#ff0080', '/effort': '#ff8000',
+    '/tools': '#00ff00', '/clear': '#ff4444', '/new': '#ff4444',
+    '/retry': '#ffff00', '/copy': '#00ffff', '/save': '#ffc0cb',
+    '/docs': '#ffffff', '/keys': '#a9a9a9', '/version': '#d3d3d3',
+    '/exit': '#ff4444'
+}
+SLASH_PALETTE = ['#ff0080', '#00ff80', '#ff4444', '#ffaa00', '#00aaff', '#ff00ff']
+
+def _slash_matches(buf):
+    buf = buf or ""
+    return [e for e in SLASH_MENU if any(n.startswith(buf) for n in e[3])] or list(SLASH_MENU)
+
+def _slash_fragments(matching, sel=0):
+    frags = []
+    for i, entry in enumerate(matching):
+        cmd, label, desc = entry[0], entry[1], entry[2]
+        if i:
+            frags.append(("", "\n"))
+        color = SLASH_COLORS.get(cmd, SLASH_PALETTE[i % len(SLASH_PALETTE)])
+        if i == sel:
+            frags.append((f"fg:{color} bg:#1a0033 bold", f" \u203a {label:<11}"))
+            frags.append(("fg:#e0e0e0 bg:#1a0033", f"  {desc} "))
+        else:
+            frags.append((f"fg:{color} bg:#0f0f0f", f"   {label:<11}"))
+            frags.append(("fg:#606060 bg:#0f0f0f", f"  {desc} "))
+    return frags
 
 class Colors:
     PINK = '\033[38;2;255;0;128m'
@@ -317,7 +381,7 @@ def print_assistant_response_text(text, marker=True):
     print()
 
 
-def _read_rich_input(prompt_text="▸ "):
+def _read_rich_input(prompt_text="\u276f "):
     global PTK_AVAILABLE
     if not PTK_AVAILABLE or not sys.stdin.isatty() or not sys.stdout.isatty():
         return None
@@ -336,16 +400,80 @@ def _read_rich_input(prompt_text="▸ "):
             "suggestion": "#00ff80 bg:#0f0f0f",
             "auto-suggestion": "#404040 italic",
         })
+
+        # ── Slash-command menu state ────────────────────────────────────────
+        slash_sel = {"i": 0}
+
+        def slash_active():
+            t = ta.buffer.text
+            return t.startswith("/") and " " not in t
+
+        def matches():
+            return _slash_matches(ta.buffer.text)
+
+        def clamped():
+            m = matches()
+            return slash_sel["i"] % len(m) if m else 0
+
+        def _reset_sel(_buf=None):
+            slash_sel["i"] = 0
+        ta.buffer.on_text_changed += _reset_sel
+
         frame = Frame(ta, width=w)
-        layout = HSplit([frame])
+        sw = Window(
+            FormattedTextControl(lambda: _slash_fragments(matches(), clamped())),
+            height=lambda: len(matches()) if slash_active() else 0,
+            dont_extend_height=True,
+        )
+        layout = HSplit([
+            frame,
+            ConditionalContainer(content=sw, filter=Condition(slash_active)),
+        ])
         kb = KeyBindings()
+        slash_cond = Condition(slash_active)
+
+        @kb.add("up", filter=slash_cond)
+        def _msel_up(ev):
+            m = matches()
+            if m:
+                slash_sel["i"] = (clamped() - 1) % len(m)
+
+        @kb.add("down", filter=slash_cond)
+        def _msel_down(ev):
+            m = matches()
+            if m:
+                slash_sel["i"] = (clamped() + 1) % len(m)
+
+        @kb.add("c-p", filter=slash_cond)
+        def _msel_up2(ev):
+            _msel_up(ev)
+
+        @kb.add("c-n", filter=slash_cond)
+        def _msel_down2(ev):
+            _msel_down(ev)
+
+        @kb.add("tab", filter=slash_cond)
+        def _msel_complete(ev):
+            m = matches()
+            if m:
+                ta.buffer.text = m[clamped()][0] + " "
+                ta.buffer.cursor_position = len(ta.buffer.text)
+
         @kb.add("enter")
         def _submit(ev):
+            if slash_active():
+                m = matches()
+                if m:
+                    ev.app.exit(result=m[clamped()][0])
+                    return
             if (ta.text or "").strip():
                 ev.app.exit(result=ta.text)
         @kb.add("escape", "enter")
         def _nl(ev):
             ta.buffer.insert_text("\n")
+        @kb.add("escape")
+        def _esc(ev):
+            ev.app.exit(result=_INPUT_GO_BACK)
         app = Application(
             layout=Layout(layout, focused_element=ta.window),
             key_bindings=kb, editing_mode=EditingMode.EMACS,
@@ -353,7 +481,7 @@ def _read_rich_input(prompt_text="▸ "):
             style=style,
         )
         text = app.run()
-        if text and HISTORY is not None:
+        if isinstance(text, str) and HISTORY is not None:
             HISTORY.append_string(text)
         return text
     except (EOFError, KeyboardInterrupt):
@@ -390,7 +518,7 @@ def _read_fallback(prompt):
 
 
 def read_input(prompt):
-    r = _read_rich_input()
+    r = _read_rich_input(re.sub(r'\033\[[0-9;]*m', '', prompt))
     if r is not None:
         return r
     return _read_fallback(prompt)
@@ -400,6 +528,7 @@ def print_banner(banner_lines, subtitle="", model="", effort="", animate=True):
     base_rgb = [
         (255, 0, 128), (255, 0, 191), (191, 0, 255),
         (128, 0, 255), (0, 128, 255), (0, 255, 255),
+        (0, 200, 128),
     ]
     def _esc(rgb):
         return f"\033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m"
@@ -410,9 +539,9 @@ def print_banner(banner_lines, subtitle="", model="", effort="", animate=True):
     grad = [_esc(c) for c in base_rgb]
     print()
     for i, line in enumerate(banner_lines):
-        print(f"{grad[i]}{c.BOLD}{line}{c.RESET}")
+        print(f"{grad[i % len(grad)]}{c.BOLD}{line}{c.RESET}")
     print()
-    if animate:
+    if animate and sys.stdout.isatty():
         n = len(banner_lines)
         print(f"\033[{n + 1}A", end="")
         print("\033[s", end="")
@@ -422,14 +551,14 @@ def print_banner(banner_lines, subtitle="", model="", effort="", animate=True):
                 print("\033[u", end="")
                 for i, line in enumerate(banner_lines):
                     intensity = max(0.0, 1.0 - abs(i - crest) / 2.0) * 0.8
-                    color = _esc(_brighten(base_rgb[i], intensity))
+                    color = _esc(_brighten(base_rgb[i % len(base_rgb)], intensity))
                     print(f"\033[2K{color}{c.BOLD}{line}{c.RESET}\n", end="")
                 print("\033[2K\n", end="")
                 time.sleep(0.04)
                 crest += 0.5
         print("\033[u", end="")
         for i, line in enumerate(banner_lines):
-            print(f"\033[2K{grad[i]}{c.BOLD}{line}{c.RESET}")
+            print(f"\033[2K{grad[i % len(grad)]}{c.BOLD}{line}{c.RESET}")
         print()
     if subtitle:
         print(f"  {c.CYAN}{subtitle}{c.RESET}")
@@ -438,5 +567,5 @@ def print_banner(banner_lines, subtitle="", model="", effort="", animate=True):
         if effort:
             model_line += f"  {c.GRAY}· effort: {c.YELLOW}{effort}{c.RESET}"
         print(model_line)
-    print(f"  {c.GRAY}Type {c.GREEN}/help{c.GRAY} for commands, {c.RED}/exit{c.GRAY} to leave.{c.RESET}")
+    print(f"  {c.GRAY}Type {c.RED}/exit{c.GRAY} to leave.{c.RESET}")
     print()
