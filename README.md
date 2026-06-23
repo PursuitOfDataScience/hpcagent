@@ -1,24 +1,11 @@
-<div align="center">
+# hpcagent
 
-```
-   ██████╗  █████╗ ██████╗ ██╗     ██╗ ██████╗
-   ██╔════╝ ██╔══██╗██╔══██╗██║     ██║██╔════╝
-   ██║  ███╗███████║██████╔╝██║     ██║██║     
-   ██║   ██║██╔══██║██╔══██╗██║     ██║██║     
-   ╚██████╔╝██║  ██║██║  ██║███████╗██║╚██████╗
-   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝
-```
-
-### ⚡ Talk to your SLURM cluster in plain English.
-
-An interactive TUI agent that manages SLURM clusters — check nodes, diagnose jobs, predict wait times, fix permissions, search docs, and more. Powered by the LLM of your choice.
+Talk to your SLURM cluster in plain English. An interactive TUI agent that checks nodes, diagnoses jobs, predicts wait times, fixes permissions, searches docs, and more. Powered by the LLM of your choice.
 
 [![CI](https://github.com/PursuitOfDataScience/hpcagent/actions/workflows/ci.yml/badge.svg)](https://github.com/PursuitOfDataScience/hpcagent/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](#-license)
 [![Status: beta](https://img.shields.io/badge/status-beta-orange.svg)](#-status)
-
-</div>
 
 ---
 
