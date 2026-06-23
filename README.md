@@ -25,24 +25,13 @@ fixes permissions, and reads your cluster's own docs — no bash incantations re
 
 ## See it
 
-```text
-❯ why is job 1837465 pending?
+<p align="center">
+  <img src="assets/demo.gif" width="840" alt="hpcagent: diagnose a pending job, mirror the cluster's docs by URL, then answer from them">
+</p>
 
-● Job 1837465 is pending in the gpu partition. The reason is QOSMaxGRES —
-  your account has hit its concurrent GPU limit.
-
-  ⚡ predict_pending_job_wait   ✓
-  ⚡ read_slurm_partitions       ✓
-
-  • Estimated start: ~3h 20m (3 jobs ahead in the same QOS)
-  • Free it sooner: cancel one of your two running gpu jobs, or submit to
-    the `gpu-shared` partition which currently has 6 idle A100s.
-
-  Want me to show your running gpu jobs?
-```
-
-> The agent streams its answer with live markdown, shows each tool as it runs,
-> and asks before anything that changes state. Type `/` any time for commands.
+> Diagnose a pending job, mirror the cluster's docs straight from their URL, then
+> get an answer cited from them. The agent streams markdown, shows each tool as it
+> runs, and asks before anything that changes state. Type `/` any time for commands.
 
 ## Why hpcagent
 
@@ -101,23 +90,20 @@ You can also paste a path or URL in the wizard's **Docs** step. Inside the TUI,
 when the docs change. Then ask *"how do I request a GPU node?"* and the agent reads
 the relevant page and answers with specifics. *(URL mirroring uses the `full` extra.)*
 
-## 🎬 Record an animated demo
+## 🎬 Regenerate the demo
 
-A ready-made [vhs](https://github.com/charmbracelet/vhs) script lives at
-[`assets/demo.tape`](assets/demo.tape). With `vhs` installed:
+The GIF above is built with [vhs](https://github.com/charmbracelet/vhs) from
+[`assets/demo.tape`](assets/demo.tape), which runs
+[`scripts/demo.py`](scripts/demo.py) — a self-animating session that uses
+hpcagent's *real* banner, streaming renderer, and tool-status output, so it looks
+exactly like the app while staying fully reproducible (no live LLM or cluster).
 
 ```bash
-vhs assets/demo.tape        # renders assets/demo.gif
+conda install -c conda-forge vhs ttyd ffmpeg   # one-time
+vhs assets/demo.tape                            # re-renders assets/demo.gif
 ```
 
-Then drop the GIF at the top of this README:
-
-```markdown
-<p align="center"><img src="assets/demo.gif" width="760" alt="hpcagent demo"></p>
-```
-
-`vhs` scripts the whole session deterministically (no live screen recording), so the
-demo is reproducible and easy to tweak.
+Edit the questions or timing in `scripts/demo.py` and re-run to taste.
 
 <details>
 <summary><strong>Models & providers</strong> (click to expand)</summary>
