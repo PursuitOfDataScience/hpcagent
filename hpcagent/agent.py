@@ -48,12 +48,11 @@ from hpcagent.hpc.nodes import (
 from hpcagent.hpc.permissions import check_path_info, manage_file_permissions
 
 DEFAULT_BANNER = [
-    r"  _   _ _____ _____     ___   _   _ _____ _   _ ",
-    r" | | | |  ___|  ___|   / _ \ | \ | |_   _| \ | |",
-    r" | |_| | |__ | |__    / /_\ \|  \| | | | |  \| |",
-    r" |  _  |  __||  __|   |  _  || . ` | | | | . ` |",
-    r" | | | | |___| |___   | | | || |\  |_| |_| |\  |",
-    r" \_| |_|____/|____/   \_| |_/\_| \_/\___/\_| \_/",
+    r"H   H PPPP   CCC          A    GGG  EEEEE N   N TTTTT",
+    r"H   H P   P C   C        A A  G     E     NN  N   T  ",
+    r"HHHHH PPPP  C           AAAAA G GG  EEEE  N N N   T  ",
+    r"H   H P     C   C       A   A G   G E     N  NN   T  ",
+    r"H   H P      CCC        A   A  GGG  EEEEE N   N   T  ",
 ]
 
 

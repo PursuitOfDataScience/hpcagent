@@ -1,12 +1,11 @@
 <div align="center">
 
 ```
-  _   _ _____ _____     ___   _   _ _____ _   _ 
- | | | |  ___|  ___|   / _ \ | \ | |_   _| \ | |
- | |_| | |__ | |__    / /_\ \|  \| | | | |  \| |
- |  _  |  __||  __|   |  _  || . ` | | | | . ` |
- | | | | |___| |___   | | | || |\  |_| |_| |\  |
- \_| |_|____/|____/   \_| |_/\_| \_/\___/\_| \_/
+H   H PPPP   CCC          A    GGG  EEEEE N   N TTTTT
+H   H P   P C   C        A A  G     E     NN  N   T  
+HHHHH PPPP  C           AAAAA G GG  EEEE  N N N   T  
+H   H P     C   C       A   A G   G E     N  NN   T  
+H   H P      CCC        A   A  GGG  EEEEE N   N   T  
 ```
 
 </div>
