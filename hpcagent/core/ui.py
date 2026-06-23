@@ -58,15 +58,6 @@ SLASH_MENU = [
     ('/version', '/version', 'Show version information',      ('/version',)),
     ('/exit',    '/exit, /quit', 'Exit the agent',            ('/exit', '/quit')),
 ]
-SLASH_COLORS = {
-    '/help': '#00ff80', '/config': '#ffaa00', '/backend': '#00aaff',
-    '/model': '#ff00ff', '/effort': '#ff8000',
-    '/tools': '#00ff00', '/clear': '#ff4444', '/new': '#ff4444',
-    '/retry': '#ffff00', '/copy': '#00ffff', '/save': '#ffc0cb',
-    '/docs': '#ffffff', '/keys': '#a9a9a9', '/version': '#d3d3d3',
-    '/exit': '#ff4444'
-}
-SLASH_PALETTE = ['#ff0080', '#00ff80', '#ff4444', '#ffaa00', '#00aaff', '#ff00ff']
 
 def _slash_matches(buf):
     buf = buf or ""
@@ -75,15 +66,14 @@ def _slash_matches(buf):
 def _slash_fragments(matching, sel=0):
     frags = []
     for i, entry in enumerate(matching):
-        cmd, label, desc = entry[0], entry[1], entry[2]
+        label, desc = entry[1], entry[2]
         if i:
             frags.append(("", "\n"))
-        color = SLASH_COLORS.get(cmd, SLASH_PALETTE[i % len(SLASH_PALETTE)])
         if i == sel:
-            frags.append((f"fg:{color} bg:#1a0033 bold", f" \u203a {label:<11}"))
+            frags.append(("fg:#00ffff bg:#1a0033 bold", f" \u203a {label:<11}"))
             frags.append(("fg:#e0e0e0 bg:#1a0033", f"  {desc} "))
         else:
-            frags.append((f"fg:{color} bg:#0f0f0f", f"   {label:<11}"))
+            frags.append(("fg:#9aa0a6 bg:#0f0f0f", f"   {label:<11}"))
             frags.append(("fg:#606060 bg:#0f0f0f", f"  {desc} "))
     return frags
 

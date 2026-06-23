@@ -24,64 +24,64 @@ from hpcagent.core.ui import (
 PROVIDER_BASE_URLS = {
     "opencode":    "https://opencode.ai/zen/v1",
     "openai":      "https://api.openai.com/v1",
+    "gemini":      "https://generativelanguage.googleapis.com/v1beta/openai",
     "groq":        "https://api.groq.com/openai/v1",
     "openrouter":  "https://openrouter.ai/api/v1",
     "deepseek":    "https://api.deepseek.com/v1",
     "mistral":     "https://api.mistral.ai/v1",
     "xai":         "https://api.x.ai/v1",
-    "github":      "https://models.inference.ai.azure.com",
     "together":    "https://api.together.xyz/v1",
 }
 
 PROVIDER_ENV_KEYS = {
     "opencode":   "OPENCODE_API_KEY",
     "openai":     "OPENAI_API_KEY",
+    "gemini":     "GEMINI_API_KEY",
     "groq":       "GROQ_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "deepseek":   "DEEPSEEK_API_KEY",
     "mistral":    "MISTRAL_API_KEY",
     "xai":        "XAI_API_KEY",
-    "github":     "GITHUB_TOKEN",
     "together":   "TOGETHER_API_KEY",
 }
 
 PROVIDER_MODEL_HINTS = {
     "opencode":   "deepseek-v4-flash-free",
     "openai":     "gpt-4o",
+    "gemini":     "gemini-2.5-flash",
     "groq":       "mixtral-8x7b-32768",
     "openrouter": "openai/gpt-4o",
     "deepseek":   "deepseek-chat",
     "mistral":    "mistral-large-latest",
     "xai":        "grok-2",
-    "github":     "gpt-4o",
     "together":   "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
 
 PROVIDER_DEFAULT_MODELS = {
     "opencode":   "deepseek-v4-flash-free",
     "openai":     "gpt-4o",
+    "gemini":     "gemini-2.5-flash",
     "groq":       "mixtral-8x7b-32768",
     "openrouter": "openai/gpt-4o",
     "deepseek":   "deepseek-chat",
     "mistral":    "mistral-large-latest",
     "xai":        "grok-2",
-    "github":     "gpt-4o",
     "together":   "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
 
 PROVIDER_MODELS = {
     "openai":     ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "o3", "o4-mini"],
+    "gemini":     ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
     "groq":       ["mixtral-8x7b-32768", "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"],
     "openrouter": ["openai/gpt-4o", "openai/gpt-4o-mini", "deepseek/deepseek-chat", "anthropic/claude-sonnet-4", "google/gemini-2.0-flash-001"],
     "deepseek":   ["deepseek-chat", "deepseek-reasoner"],
     "mistral":    ["mistral-large-latest", "mistral-small-latest", "codestral-latest", "ministral-8b-latest"],
     "xai":        ["grok-2", "grok-2-vision"],
     "opencode":   ["deepseek-v4-flash-free"],
-    "github":     ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"],
     "together":   ["mistralai/Mixtral-8x7B-Instruct-v0.1", "mistralai/Mistral-7B-Instruct-v0.3"],
 }
 
-CLI_BACKENDS = {"codex", "claude", "agy"}
+CLI_BACKENDS = {"codex", "claude"}
 
 KNOWN_PROVIDERS = set(PROVIDER_BASE_URLS.keys()) | CLI_BACKENDS
 
@@ -230,7 +230,7 @@ class LLMClient:
 
     Provider-agnostic: pass any known backend name (openai, groq, deepseek,
     openrouter, together, mistral, xai, github, opencode, …) or ``custom``.
-    CLI-based backends (codex, claude, agy) are also supported.
+    CLI-based backends (codex, claude) are also supported.
 
     API key resolution order:
       1. ``api_key`` kwarg
@@ -260,9 +260,6 @@ class LLMClient:
         self.claude_model = kwargs.get("claude_model", "")
         self.claude_effort = kwargs.get("claude_effort", "")
         self.claude_dangerously_skip_permissions = kwargs.get("claude_dangerously_skip_permissions", False)
-
-        self.agy_bin = kwargs.get("agy_bin") or shutil_which("agy") or ""
-        self.agy_timeout = kwargs.get("agy_timeout", 120)
 
         # ── Internal state ──────────────────────────────────────────────────
         self._effort_override: dict[str, str] = {}
@@ -924,123 +921,6 @@ class LLMClient:
                 print()
 
         return response_text
-
-    # ── agy CLI ────────────────────────────────────────────────────────────
-
-    def _build_agy_prompt(self, user_input: str, conversation: list) -> str:
-        parts = []
-        recent = []
-        count = 0
-        for msg in reversed(conversation):
-            if msg.get("role") == "user":
-                recent.append(("[User]", msg.get("content", "")))
-                count += 1
-            elif msg.get("role") == "assistant" and msg.get("content"):
-                recent.append(("[Assistant]", msg.get("content", "")))
-            elif msg.get("role") == "tool" and msg.get("content"):
-                recent.append(("[Tool Result]", msg.get("content", "")))
-            if count >= 4:
-                break
-        recent.reverse()
-        for label, content in recent:
-            parts.append(f"{label}\n{content}\n")
-        parts.append(f"[Current user question]\n{user_input}\n")
-        parts.append("Answer the current question.")
-        return "\n".join(parts)
-
-    def run_agy_step(self, user_input: str, conversation: list, system_prompt: str,
-                     is_continuation: bool = False):
-        if not self.agy_bin or not os.path.isfile(self.agy_bin):
-            print(f"{Colors.STATUS_ERR}\u2717 agy binary not found at {self.agy_bin}{Colors.RESET}")
-            return conversation
-
-        if not is_continuation:
-            conversation.append({"role": "user", "content": user_input})
-
-        prompt = self._build_agy_prompt(user_input, conversation)
-
-        use_animation = sys.stdout.isatty()
-        animation = ThinkingAnim() if use_animation else None
-        if animation:
-            animation.start()
-        else:
-            print(f"\r\033[K{c.GRAY}... Running agy...\033[K{c.RESET}", end="", flush=True)
-
-        try:
-            proc_env = {**os.environ, 'TERM': 'xterm-256color', 'HOME': os.path.expanduser('~')}
-            proc = subprocess.Popen(
-                [self.agy_bin, "--print", prompt],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, env=proc_env,
-            )
-            if not proc.stdout or not proc.stderr:
-                raise RuntimeError("Failed to open agy stdout/stderr streams.")
-
-            md_renderer = StreamRenderer()
-            prompt_label_shown = False
-            response_chunks = []
-            stderr_chunks = []
-            import select as sel_mod
-            streams = [proc.stdout, proc.stderr]
-            start_time = time.time()
-
-            while streams:
-                if time.time() - start_time > self.agy_timeout:
-                    proc.kill()
-                    raise subprocess.TimeoutExpired(proc.args, self.agy_timeout)
-                ready, _, _ = sel_mod.select(streams, [], [], 0.1)
-                if not ready:
-                    if proc.poll() is not None and not streams:
-                        break
-                    continue
-                for stream in list(ready):
-                    line = stream.readline()
-                    if line == "":
-                        if stream in streams:
-                            streams.remove(stream)
-                        continue
-                    if stream is proc.stdout:
-                        if animation and animation.running:
-                            animation.stop()
-                        if not prompt_label_shown:
-                            print("\r\033[K", end="", flush=True)
-                            print(f"{c.TEAL}{c.BOLD}\u25cf{c.RESET} ", end="", flush=True)
-                            prompt_label_shown = True
-                        md_renderer.process_chunk(line)
-                        response_chunks.append(line)
-                    else:
-                        stderr_chunks.append(line)
-
-            if animation and animation.running:
-                animation.stop()
-            md_renderer.flush()
-            proc.wait(timeout=1)
-
-            response = "".join(response_chunks).strip()
-            if not response:
-                response = "*(empty response)*"
-
-            if not prompt_label_shown:
-                print("\r\033[K", end="", flush=True)
-                print(f"{c.TEAL}{c.BOLD}\u25cf{c.RESET} ", end="", flush=True)
-                md_renderer.process_chunk(response)
-                md_renderer.flush()
-
-            conversation.append({"role": "assistant", "content": response})
-
-        except subprocess.TimeoutExpired:
-            if animation and animation.running:
-                animation.stop()
-            print(f"\r\033[K{Colors.STATUS_ERR}\u2717 Request timed out ({self.agy_timeout}s){Colors.RESET}")
-        except FileNotFoundError:
-            if animation and animation.running:
-                animation.stop()
-            print(f"\r\033[K{Colors.STATUS_ERR}\u2717 agy binary not found{Colors.RESET}")
-        except Exception as e:
-            if animation and animation.running:
-                animation.stop()
-            print(f"\r\033[K{Colors.STATUS_ERR}\u2717 Error: {str(e)}{Colors.RESET}")
-
-        return conversation
 
     # ── Utilities ──────────────────────────────────────────────────────────
 

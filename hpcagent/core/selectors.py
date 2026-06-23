@@ -2,18 +2,6 @@ import sys
 
 _SELECTION_CANCELLED = object()
 
-_MENU_ROW_HEX = ['#7dd3fc', '#86efac', '#fda4af', '#fcd34d', '#c4b5fd', '#5eead4', '#f9a8d4', '#fdba74']
-
-
-def _menu_row_ansi(i):
-    h = _MENU_ROW_HEX[i % len(_MENU_ROW_HEX)].lstrip('#')
-    return f'\033[38;2;{int(h[0:2], 16)};{int(h[2:4], 16)};{int(h[4:6], 16)}m'
-
-
-def _hex_to_ansi(hexstr):
-    h = hexstr.lstrip('#')
-    return f'\033[38;2;{int(h[0:2], 16)};{int(h[2:4], 16)};{int(h[4:6], 16)}m'
-
 
 def _fallback_select(options, header="Select option"):
     """Text-based fallback when not on a TTY."""
@@ -59,7 +47,9 @@ def interactive_select(options, header="Select option", current_label="", defaul
     if display_fn is None:
         display_fn = str
     if selected_color is None:
-        selected_color = f"{c.BOLD}"
+        selected_color = f"{c.BOLD}{c.CYAN}"
+    if unselected_color is None:
+        unselected_color = c.GRAY
     always_show = always_show or set()
 
     import shutil
@@ -106,12 +96,11 @@ def interactive_select(options, header="Select option", current_label="", defaul
             lines.append(f"  {c.DIM}(no matches){c.RESET}")
         for pos, orig_i in enumerate(window):
             real_pos = offset + pos
-            rc = _menu_row_ansi(real_pos)
             label = _truncate(display_fn(options[orig_i]))
             if real_pos == sel:
-                lines.append(f"  {selected_color}{rc}{c.BOLD}> {label}{c.RESET}")
+                lines.append(f"  {selected_color}> {label}{c.RESET}")
             else:
-                lines.append(f"    {rc}{label}{c.RESET}")
+                lines.append(f"    {unselected_color}{label}{c.RESET}")
         more = len(filt) - (offset + len(window))
         if more > 0:
             lines.append(f"  {c.DIM}\u2026 {more} more{c.RESET}")

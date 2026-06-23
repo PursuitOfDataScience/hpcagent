@@ -18,7 +18,6 @@ from hpcagent.core.selectors import _SELECTION_CANCELLED, interactive_select
 from hpcagent.core.tools import ToolRegistry, ToolRisk
 from hpcagent.core.ui import (
     _INPUT_GO_BACK,
-    SLASH_COLORS,
     SLASH_MENU,
     c,
     print_banner,
@@ -87,18 +86,6 @@ Rules:
 3. For time-sensitive queries, use web_search and web_fetch.
 4. When a MUTATING/DESTRUCTIVE tool is needed, explain what you will do and wait for confirmation.
 5. Be concise and precise in answers about cluster status."""
-
-
-def hex_to_ansi(hex_str: str) -> str:
-    if not hex_str.startswith('#') or len(hex_str) != 7:
-        return ""
-    try:
-        r = int(hex_str[1:3], 16)
-        g = int(hex_str[3:5], 16)
-        b = int(hex_str[5:7], 16)
-        return f"\033[38;2;{r};{g};{b}m"
-    except ValueError:
-        return ""
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -500,7 +487,7 @@ class HPCAgent:
         whose env key is already set, falling back to opencode.
         """
         import shutil
-        for cli in ("claude", "codex", "agy"):
+        for cli in ("claude", "codex"):
             if shutil.which(cli):
                 return cli
         if os.environ.get("OPENCODE_API_KEY"):
@@ -837,11 +824,9 @@ class HPCAgent:
                         self._exit()
 
                     elif cmd == '/help':
-                        print(f"\n  {c.BOLD}{c.PINK}Available Slash Commands:{c.RESET}\n")
+                        print(f"\n  {c.BOLD}{c.CYAN}Available Slash Commands:{c.RESET}\n")
                         for name, label, desc, aliases in SLASH_MENU:
-                            color_hex = SLASH_COLORS.get(name, '#00ff80')
-                            color_ansi = hex_to_ansi(color_hex) or c.GREEN
-                            print(f"    {color_ansi}{label:<15}{c.RESET} {desc}")
+                            print(f"    {c.CYAN}{label:<15}{c.RESET} {c.GRAY}{desc}{c.RESET}")
                         print()
                         continue
 
@@ -1119,10 +1104,6 @@ class HPCAgent:
             self._claude_first = False
             if response_text:
                 self.conversation.append({"role": "assistant", "content": response_text})
-        elif self.backend == 'agy':
-            self.conversation = self.llm.run_agy_step(
-                user_input, self.conversation, system_prompt,
-            )
         else:
             self.conversation = self.llm.run_chat_step(
                 user_input, self.conversation, system_prompt, self.tools,

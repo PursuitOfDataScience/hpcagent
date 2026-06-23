@@ -41,17 +41,17 @@ Type your question — "show me all GPU jobs", "why is job 1234 pending?", "chec
 | Provider | `--backend` | Auth | Type |
 |----------|-------------|------|------|
 | OpenAI | `openai` | `OPENAI_API_KEY` | API (Curated Tools) |
+| Google Gemini | `gemini` | `GEMINI_API_KEY` | API (Curated Tools) |
 | Groq | `groq` | `GROQ_API_KEY` | API (Curated Tools) |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | API (Curated Tools) |
 | DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` | API (Curated Tools) |
 | Mistral | `mistral` | `MISTRAL_API_KEY` | API (Curated Tools) |
 | xAI | `xai` | `XAI_API_KEY` | API (Curated Tools) |
-| GitHub Models | `github` | `GITHUB_TOKEN` | API (Curated Tools) |
+| Together | `together` | `TOGETHER_API_KEY` | API (Curated Tools) |
 | OpenCode | `opencode` | `OPENCODE_API_KEY` | API (Curated Tools) |
 | Any OpenAI-compatible API | `custom` | set `--api-base-url` | API (Curated Tools) |
 | Codex CLI | `codex` | _(uses `codex` binary)_ | CLI (Bring-your-own-tools) |
 | Claude CLI | `claude` | _(uses `claude` binary)_ | CLI (Bring-your-own-tools) |
-| agy | `agy` | _(uses `agy` binary)_ | CLI (Bring-your-own-tools) |
 
 > [!NOTE]
 > **API vs. CLI backends:** API backends use the python-based curated HPC tools registered in `hpcagent` (e.g. permission checks, job wait time estimates, custom quotas). CLI backends run external CLI binaries directly, executing bash commands and using their own tool systems without the python-based custom wrappers.
