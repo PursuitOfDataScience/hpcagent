@@ -41,10 +41,8 @@ Issues = "https://github.com/PursuitOfDataScience/hpcagent/issues"
 full = [
     "ddgs>=0.7",
     "trafilatura>=1.6",
-    "llama-api-client>=0.8",
 ]
 web = ["ddgs>=0.7", "trafilatura>=1.6"]
-llama = ["llama-api-client>=0.8"]
 ui = ["prompt_toolkit>=3.0,<4"]
 dev = [
     "pytest>=7.0",
