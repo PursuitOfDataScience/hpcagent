@@ -2,7 +2,8 @@ import os
 import re
 
 from hpcagent.core.config import JsonConfig
-from hpcagent.core.llm import LLMClient
+from hpcagent.core.llm import CLI_BACKENDS, PROVIDER_BASE_URLS, PROVIDER_ENV_KEYS, LLMClient
+from hpcagent.core.selectors import _SELECTION_CANCELLED, interactive_select
 from hpcagent.core.tools import ToolRegistry
 from hpcagent.core.ui import (
     c,
@@ -70,29 +71,25 @@ class HPCAgent:
         self.system_prompt_append = kwargs.get("system_prompt_append", "")
         self.banner_lines = kwargs.get("banner_lines", DEFAULT_BANNER)
         self.banner_subtitle = kwargs.get("banner_subtitle", "HPC Agent")
-        self.backend = kwargs.get("backend", os.environ.get("HPCAGENT_BACKEND", "opencode"))
-        self.model = kwargs.get("model") or os.environ.get("OPENCODE_MODEL", "deepseek-v4-flash-free")
-        self.api_key = kwargs.get("api_key", "")
-        self.api_base_url = kwargs.get("api_base_url", "")
 
-        # LLM client — strip keys that LLMClient doesn't expect, pass rest
-        llm_skip = {"system_prompt", "system_prompt_append", "banner_lines",
-                     "banner_subtitle", "config_path", "docs_base_path",
-                     "web_base_path", "register_hooks", "backend"}
-        llm_kwargs = {k: v for k, v in kwargs.items() if k not in llm_skip}
-        self.llm = LLMClient(backend=self.backend, **llm_kwargs)
-
-        # Config
+        # Config file — load saved settings, CLI args override
         self.config = JsonConfig(kwargs.get("config_path", "~/.hpcagent_config"))
+        self.backend = kwargs.get("backend") or self.config.get("backend") or os.environ.get("HPCAGENT_BACKEND", "opencode")
+        self.model = kwargs.get("model") or self.config.get("model") or os.environ.get("OPENCODE_MODEL", "deepseek-v4-flash-free")
+        self.api_key = kwargs.get("api_key") or self.config.get("api_key") or ""
+        self.api_base_url = kwargs.get("api_base_url") or self.config.get("api_base_url") or ""
+        self.docs_base_path = kwargs.get("docs_base_path") or self.config.get("docs_base_path") or ""
+        self.web_base_path = kwargs.get("web_base_path") or self.config.get("web_base_path") or ""
+
+        # LLM client
+        self._init_llm()
 
         # Tool registry
         self.tools = ToolRegistry()
 
-        # Documentation paths (set by subclass)
+        # Documentation paths
         self.doc_paths = {}
         self.web_doc_paths = {}
-        self.docs_base_path = kwargs.get("docs_base_path", "")
-        self.web_base_path = kwargs.get("web_base_path", "")
 
         # Conversation state
         self.conversation = []
@@ -108,6 +105,15 @@ class HPCAgent:
         self._register_hooks = kwargs.get("register_hooks", None)
         if self._register_hooks:
             self._register_hooks(self.tools)
+
+    def _init_llm(self):
+        llm_kwargs = {
+            "api_key": self.api_key,
+            "api_base_url": self.api_base_url,
+        }
+        if self.model:
+            llm_kwargs["model"] = self.model
+        self.llm = LLMClient(backend=self.backend, **llm_kwargs)
 
     def _register_core_tools(self):
         t = self.tools
@@ -253,9 +259,78 @@ class HPCAgent:
             return f"=== WEB CONTENT: {doc_path} ===\n\n{content}"
         return f"Unknown doc tool: {name}"
 
+    def _needs_setup(self) -> bool:
+        """Check if the agent needs initial setup (no API key, no CLI backend)."""
+        if self.backend in CLI_BACKENDS:
+            return False
+        if self.api_key:
+            return False
+        env_var = PROVIDER_ENV_KEYS.get(self.backend, "")
+        if env_var and os.environ.get(env_var):
+            return False
+        return True
+
+    def _setup_wizard(self):
+        """Interactive setup wizard for first-time users."""
+        print(f"\n{c.BOLD}{c.PINK}Welcome to HPC Agent!{c.RESET}")
+        print(f"  {c.GRAY}Let's set up your LLM backend.{c.RESET}\n")
+
+        # Pick backend
+        known = sorted(PROVIDER_BASE_URLS.keys()) + sorted(CLI_BACKENDS)
+        labels = []
+        for b in known:
+            if b in CLI_BACKENDS:
+                labels.append(f"{b}  (CLI — no API key needed)")
+            else:
+                env = PROVIDER_ENV_KEYS.get(b, "")
+                labels.append(f"{b}  (env: ${env})")
+        idx = interactive_select(labels, header="Choose your LLM provider",
+                                  current_label=self.backend)
+        if idx is _SELECTION_CANCELLED:
+            return
+        self.backend = known[idx]
+        self.config.set("backend", self.backend)
+
+        # If CLI backend, we're done
+        if self.backend in CLI_BACKENDS:
+            print(f"  {c.GREEN}Using {self.backend} CLI.{c.RESET}\n")
+            self._init_llm()
+            return
+
+        # API key
+        env_var = PROVIDER_ENV_KEYS.get(self.backend, "")
+        cur_key = self.api_key or os.environ.get(env_var, "")
+        if not cur_key:
+            print(f"  {c.YELLOW}Enter your API key (or set ${env_var}){c.RESET}")
+            key = read_input(f"  {c.CYAN}API key\u276f {c.RESET}").strip()
+            if key:
+                self.api_key = key
+                self.config.set("api_key", key)
+
+        # Model
+        cur_model = self.model
+        print(f"  {c.YELLOW}Enter model name (or press Enter for '{cur_model}'){c.RESET}")
+        model = read_input(f"  {c.CYAN}Model\u276f {c.RESET}").strip()
+        if model:
+            self.model = model
+            self.config.set("model", model)
+
+        # Docs path (optional)
+        print(f"  {c.YELLOW}Optional: path to your cluster docs (Enter to skip){c.RESET}")
+        docs = read_input(f"  {c.CYAN}Docs path\u276f {c.RESET}").strip()
+        if docs:
+            self.docs_base_path = docs
+            self.config.set("docs_base_path", docs)
+
+        self._init_llm()
+        print(f"\n  {c.GREEN}Setup complete!{c.RESET}\n")
+
     def run(self):
         self.conversation = []
         self.codex_state = {"thread_id": None, "conv": []}
+
+        if self._needs_setup():
+            self._setup_wizard()
 
         print_banner(
             self.banner_lines,
@@ -281,6 +356,9 @@ class HPCAgent:
                         break
                     elif inp == '/help':
                         self._show_help()
+                        continue
+                    elif inp == '/config':
+                        self._setup_wizard()
                         continue
                     else:
                         print(f"{c.RED}Unknown command: {inp}{c.RESET}")
@@ -321,6 +399,7 @@ class HPCAgent:
         print(f"\n{c.BOLD}{c.PINK}\u203a Available Commands{c.RESET}")
         print(f"   {c.GREEN}{c.BOLD}/help{c.RESET}        {c.GRAY}Show this help message{c.RESET}")
         print(f"   {c.RED}{c.BOLD}/exit{c.RESET}, {c.RED}/quit{c.RESET}  {c.GRAY}Exit the agent{c.RESET}")
+        print(f"   {c.YELLOW}{c.BOLD}/config{c.RESET}      {c.GRAY}Reconfigure backend / API key / model{c.RESET}")
         print()
 
     def add_doc_tool(self, name: str, description: str, doc_path: str, web: bool = False):
