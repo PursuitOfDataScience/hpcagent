@@ -359,8 +359,11 @@ class LLMClient:
                     current_tool_input = ""
                     reasoning_content = ""
 
-                    for line in resp.iter_lines(decode_unicode=True):
-                        if not line or line.strip() == "":
+                    for raw_line in resp.iter_lines():
+                        if not raw_line:
+                            continue
+                        line = raw_line.decode("utf-8", "replace") if isinstance(raw_line, (bytes, bytearray)) else str(raw_line)
+                        if not line.strip():
                             continue
                         if line.startswith("data: "):
                             data = line[6:].strip()

@@ -45,8 +45,7 @@ SLASH_MENU = [
     ('/help',    '/help',    'Show help about commands',      ('/help',)),
     ('/config',  '/config',  'Reconfigure backend/API key',   ('/config',)),
     ('/backend', '/backend', 'Select a different provider',   ('/backend',)),
-    ('/model',   '/model',   'Select a different model',      ('/model',)),
-    ('/models',  '/models',  'List available models',         ('/models',)),
+    ('/model',   '/model',   'Browse, search & switch models', ('/model', '/models')),
     ('/effort',  '/effort',  'Set reasoning effort level',    ('/effort',)),
     ('/tools',   '/tools',   'List registered HPC tools',     ('/tools',)),
     ('/clear',   '/clear',   'Clear conversation history',    ('/clear', '/new')),
@@ -61,7 +60,7 @@ SLASH_MENU = [
 ]
 SLASH_COLORS = {
     '/help': '#00ff80', '/config': '#ffaa00', '/backend': '#00aaff',
-    '/model': '#ff00ff', '/models': '#ff0080', '/effort': '#ff8000',
+    '/model': '#ff00ff', '/effort': '#ff8000',
     '/tools': '#00ff00', '/clear': '#ff4444', '/new': '#ff4444',
     '/retry': '#ffff00', '/copy': '#00ffff', '/save': '#ffc0cb',
     '/docs': '#ffffff', '/keys': '#a9a9a9', '/version': '#d3d3d3',
@@ -567,5 +566,5 @@ def print_banner(banner_lines, subtitle="", model="", effort="", animate=True):
         if effort:
             model_line += f"  {c.GRAY}· effort: {c.YELLOW}{effort}{c.RESET}"
         print(model_line)
-    print(f"  {c.GRAY}Type {c.RED}/exit{c.GRAY} to leave.{c.RESET}")
+    print(f"  {c.GRAY}Type {c.PINK}/help{c.GRAY} for commands · {c.PINK}/config{c.GRAY} to set up · {c.RED}/exit{c.GRAY} to leave.{c.RESET}")
     print()

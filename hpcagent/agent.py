@@ -162,6 +162,9 @@ class HPCAgent:
             else:
                 config_path = default_config_path
         self.config = JsonConfig(config_path)
+        self._sanitize_config()
+        # Did the user explicitly pick a backend/model on the CLI? If so, don't force onboarding.
+        self._cli_configured = bool(kwargs.get("backend") or kwargs.get("model"))
 
         self._raw_system_prompt = kwargs.get("system_prompt") or self.config.get("system_prompt") or ""
         self.system_prompt_append = kwargs.get("system_prompt_append") or self.config.get("system_prompt_append") or ""
@@ -475,6 +478,20 @@ class HPCAgent:
             return f"=== WEB CONTENT: {doc_path} ===\n\n{content}"
         return f"Unknown doc tool: {name}"
 
+    def _sanitize_config(self):
+        """Drop garbage values a previous broken wizard may have saved.
+
+        Earlier builds could persist a typed slash-command (e.g. '/exit') as the
+        model or docs path. Clear any such junk so startup isn't polluted.
+        """
+        bad = {"/exit", "/quit", "/config", "/help", "/model", "/models",
+               "/backend", "/effort", "/tools", "/clear", "/new", "/docs", "/keys"}
+        for key in ("model", "docs_base_path", "web_base_path", "system_prompt",
+                    "system_prompt_append"):
+            val = self.config.get(key)
+            if isinstance(val, str) and val.strip() in bad:
+                self.config.set(key, "")
+
     @staticmethod
     def _auto_default_backend() -> str:
         """Pick a sensible default backend so a zero-arg run 'just works'.
@@ -717,14 +734,21 @@ class HPCAgent:
                 self.config.set("dangerous_bypass", False)
 
             # ── Docs path ──────────────────────────────────────────────────
-            print(f"  {c.YELLOW}Optional: path to your cluster docs (Enter to skip){c.RESET}")
-            print(f"  {c.GRAY}Press ESC to go back{c.RESET}")
+            if self.docs_base_path:
+                print(f"  {c.YELLOW}Path to your cluster docs (current: {self.docs_base_path}){c.RESET}")
+                print(f"  {c.GRAY}Enter to keep · type a new path · '-' to clear · ESC to go back{c.RESET}")
+            else:
+                print(f"  {c.YELLOW}Optional: path to a folder of cluster docs/skills (Enter to skip){c.RESET}")
+                print(f"  {c.GRAY}The agent reads these to answer cluster-specific questions. ESC to go back.{c.RESET}")
             docs = self._read_or_back(f"  {c.CYAN}Docs path\u276f {c.RESET}")
             if docs is None:
                 continue
-            if docs:
-                self.docs_base_path = docs
-                self.config.set("docs_base_path", docs)
+            if docs == "-":
+                self.docs_base_path = ""
+                self.config.set("docs_base_path", "")
+            elif docs:
+                self.docs_base_path = os.path.expanduser(docs)
+                self.config.set("docs_base_path", self.docs_base_path)
 
             self._init_llm()
             # Auto-load skills if docs path is set
@@ -736,20 +760,49 @@ class HPCAgent:
                         print(f"  {c.GREEN}Loaded skills from {skills_path}{c.RESET}")
                     except Exception as e:
                         print(f"  {c.YELLOW}Could not load skills: {e}{c.RESET}")
-            print(f"\n  {c.GREEN}Setup complete!{c.RESET}\n")
+            self._print_setup_summary()
             return
 
         self._init_llm()
-        print(f"\n  {c.GREEN}Setup complete!{c.RESET}\n")
+        self._print_setup_summary()
+
+    def _print_setup_summary(self):
+        if self.api_key_source == "session":
+            key_label = "session-only (not saved)"
+        elif self.api_key_source == "file":
+            key_label = "saved to credentials file (0600)"
+        elif self.api_key_source == "none":
+            key_label = "none (CLI / no key)"
+        elif self.backend in CLI_BACKENDS:
+            key_label = "handled by the CLI"
+        else:
+            env_var = PROVIDER_ENV_KEYS.get(self.backend, "")
+            key_label = f"environment (${env_var})" if env_var and os.environ.get(env_var) else "none"
+
+        print(f"\n  {c.GREEN}{c.BOLD}Setup complete!{c.RESET}")
+        print(f"    {c.GRAY}Provider:{c.RESET} {self.backend}")
+        print(f"    {c.GRAY}Model:{c.RESET}    {self.model or '(provider default)'}")
+        print(f"    {c.GRAY}Docs:{c.RESET}     {self.docs_base_path or '(none)'}")
+        print(f"    {c.GRAY}API key:{c.RESET}  {key_label}")
+        print(f"\n  {c.GRAY}Try asking:{c.RESET}")
+        print(f"    {c.CYAN}• why is job 1234 pending?{c.RESET}")
+        print(f"    {c.CYAN}• how do I request a GPU node?{c.RESET}")
+        print(f"  {c.GRAY}Type {c.PINK}/help{c.GRAY} for commands, {c.PINK}/config{c.GRAY} to change this.{c.RESET}\n")
 
     def run(self):
         self.conversation = []
         self.codex_state = {"thread_id": None}
 
+        first_run = not self.config.get("onboarded")
         needs_setup = self._needs_setup()
-        if needs_setup:
+        # Run the wizard on first launch (so users always get to pick a model + docs),
+        # or whenever an API backend has no key. Skip if they configured via CLI flags.
+        if needs_setup or (first_run and not self._cli_configured):
             self._setup_wizard()
+            self.config.set("onboarded", True)
             needs_setup = self._needs_setup()
+        elif first_run:
+            self.config.set("onboarded", True)
 
         if needs_setup and self.backend not in CLI_BACKENDS:
             env_var = PROVIDER_ENV_KEYS.get(self.backend, "")
@@ -813,7 +866,7 @@ class HPCAgent:
                                 print(f"  {c.GREEN}Initialized backend {self.backend} (model: {self.model}){c.RESET}")
                         continue
 
-                    elif cmd == '/model':
+                    elif cmd in ('/model', '/models'):
                         cur_model = self.model if self.model else ""
                         print(f"  {c.GRAY}Fetching available models from {self.backend}...{c.RESET}")
                         env_var = PROVIDER_ENV_KEYS.get(self.backend, "")
@@ -858,28 +911,6 @@ class HPCAgent:
                                 self._init_llm()
                         else:
                             print(f"  {c.RED}No models found or backend does not support model listing.{c.RESET}")
-                        continue
-
-                    elif cmd == '/models':
-                        print(f"  {c.GRAY}Discovering available models for {self.backend}...{c.RESET}")
-                        env_var = PROVIDER_ENV_KEYS.get(self.backend, "")
-                        api_key = self.api_key or os.environ.get(env_var, "")
-                        try:
-                            models = discover_models(self.backend, api_key=api_key, api_base_url=self.api_base_url)
-                        except Exception as e:
-                            print(f"  {c.RED}Failed to discover models: {e}{c.RESET}")
-                            models = []
-                        if not models:
-                            models = PROVIDER_MODELS.get(self.backend, [])
-                        if models:
-                            print(f"\n  {c.BOLD}{c.PINK}Available Models for {self.backend}:{c.RESET}\n")
-                            for m in sorted(models):
-                                prefix = f"    * {c.GREEN}" if m == self.model else "      "
-                                suffix = f" {c.YELLOW}(current){c.RESET}" if m == self.model else ""
-                                print(f"{prefix}{m}{suffix}")
-                            print()
-                        else:
-                            print(f"  {c.YELLOW}No models found for backend {self.backend}.{c.RESET}")
                         continue
 
                     elif cmd == '/effort':
