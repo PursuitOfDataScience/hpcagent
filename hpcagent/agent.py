@@ -168,7 +168,7 @@ class HPCAgent:
         self.api_base_url = kwargs.get("api_base_url") or self.config.get("api_base_url") or ""
         self.docs_base_path = kwargs.get("docs_base_path") or self.config.get("docs_base_path") or ""
         self.docs_url = kwargs.get("docs_url") or self.config.get("docs_url") or ""
-        self.docs_max_pages = kwargs.get("docs_max_pages") or self.config.get("docs_max_pages") or 100
+        self.docs_max_pages = kwargs.get("docs_max_pages") or self.config.get("docs_max_pages") or 400
         self.web_base_path = kwargs.get("web_base_path") or self.config.get("web_base_path") or ""
         self.dangerous_bypass = kwargs.get("dangerous_bypass") or self.config.get("dangerous_bypass") or False
         self.reasoning_effort = kwargs.get("effort") or kwargs.get("reasoning_effort") or self.config.get("reasoning_effort") or ""

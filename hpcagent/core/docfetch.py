@@ -5,8 +5,8 @@ breadth-first crawl of same-site links), extract each to markdown, and write the
 to a local directory so the agent can read them instantly and offline. The source
 URL is recorded in a manifest so the mirror can be re-synced later.
 
-The crawl is bounded by both a page cap and a wall-clock budget so it never hangs
-on large or slow sites.
+Pages are fetched concurrently and the crawl is bounded by both a page cap and a
+wall-clock budget, so it stays fast and never hangs on large or slow sites.
 """
 
 import gzip
@@ -14,10 +14,16 @@ import json
 import os
 import re
 import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 DOCS_CACHE_ROOT = os.path.expanduser("~/.cache/hpcagent/docs")
+
+DEFAULT_MAX_PAGES = 400
+DEFAULT_TIME_BUDGET = 300
+# I/O-bound crawl: scale past core count, but stay polite to the server.
+DEFAULT_WORKERS = min(32, (os.cpu_count() or 8) * 2)
 
 # Non-document assets we never want to fetch/extract.
 _SKIP_EXT = (
@@ -26,6 +32,8 @@ _SKIP_EXT = (
     ".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".mov", ".webm",
     ".mp3", ".wav", ".json", ".xml", ".csv", ".txt", ".rss", ".atom",
 )
+
+_UA = "hpcagent-docs/0.1 (+local docs mirror)"
 
 
 def _load_trafilatura():
@@ -55,13 +63,6 @@ def mirror_dir_for(url: str) -> str:
     return os.path.join(DOCS_CACHE_ROOT, slug)
 
 
-def _session():
-    import requests
-    s = requests.Session()
-    s.headers.update({"User-Agent": "hpcagent-docs/0.1 (+local docs mirror)"})
-    return s
-
-
 def _norm_url(u: str) -> str:
     p = urlparse(u)
     path = p.path
@@ -80,9 +81,11 @@ def _path_prefix(parsed) -> str:
     return prefix
 
 
-def _fetch_html(session, url: str, timeout: int = 12) -> str | None:
+def _fetch_html(url: str, timeout: int = 12) -> str | None:
+    """Fetch a URL and return HTML text, or None for non-HTML/errors."""
+    import requests
     try:
-        r = session.get(url, timeout=timeout)
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": _UA})
     except Exception:
         return None
     ctype = r.headers.get("content-type", "").lower()
@@ -108,11 +111,13 @@ def _extract_links(html: str, base_url: str, host: str, prefix: str) -> list[str
     return links
 
 
-def _sitemap_urls(start: str, host: str, timeout: int = 8) -> list[str]:
+def _sitemap_urls(start: str, host: str, timeout: int = 10) -> list[str]:
     """Best-effort, fast sitemap read (handles .gz and sitemap-index)."""
+    import requests
     urls: list[str] = []
+    session = requests.Session()
+    session.headers.update({"User-Agent": _UA})
     try:
-        session = _session()
         for path in ("/sitemap.xml", "/sitemap.xml.gz"):
             try:
                 r = session.get(urljoin(start, path), timeout=timeout)
@@ -127,6 +132,7 @@ def _sitemap_urls(start: str, host: str, timeout: int = 8) -> list[str]:
                 continue
             locs = re.findall(r"<loc>\s*(.*?)\s*</loc>", text)
             for loc in locs:
+                loc = loc.strip()
                 if loc.endswith((".xml", ".xml.gz")):  # nested sitemap index
                     try:
                         rr = session.get(loc, timeout=timeout)
@@ -140,7 +146,7 @@ def _sitemap_urls(start: str, host: str, timeout: int = 8) -> list[str]:
                 break
     except Exception:
         return []
-    return [_norm_url(u) for u in urls if urlparse(u).netloc == host]
+    return [_norm_url(u.strip()) for u in urls if urlparse(u.strip()).netloc == host]
 
 
 def _extract_markdown(traf, html: str) -> str:
@@ -168,13 +174,53 @@ def _page_title(traf, html: str) -> str:
     return re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
 
 
-def mirror_docs(url: str, dest_dir: str | None = None, max_pages: int = 100,
-                progress=None, time_budget: int = 180) -> dict:
+def _crawl_one(args):
+    """Fetch + extract a single page. Top-level so it is picklable for processes.
+
+    Returns ``(url, markdown_or_None, title_or_None, links)``.
+    """
+    url, host, prefix = args
+    traf = _load_trafilatura()
+    if traf is None:
+        return (url, None, None, [])
+    html = _fetch_html(url)
+    if not html:
+        return (url, None, None, [])
+    return (url, _extract_markdown(traf, html), _page_title(traf, html),
+            _extract_links(html, url, host, prefix))
+
+
+def _probe_ok():
+    return True
+
+
+def _make_pool(workers: int):
+    """Prefer a process pool (real multi-core extraction); fall back to threads.
+
+    Probes the process pool so we degrade gracefully in sandboxes that forbid
+    forking/spawning subprocesses, rather than failing the whole crawl.
+    """
+    try:
+        pool = ProcessPoolExecutor(max_workers=max(1, workers))
+        pool.submit(_probe_ok).result(timeout=30)
+        return pool, "process"
+    except Exception:
+        try:
+            pool.shutdown(cancel_futures=True)  # type: ignore[possibly-undefined]
+        except Exception:
+            pass
+        return ThreadPoolExecutor(max_workers=max(1, workers)), "thread"
+
+
+def mirror_docs(url: str, dest_dir: str | None = None, max_pages: int = DEFAULT_MAX_PAGES,
+                progress=None, time_budget: int = DEFAULT_TIME_BUDGET,
+                workers: int = DEFAULT_WORKERS) -> dict:
     """Crawl ``url`` into a local markdown mirror. Returns a manifest dict.
 
-    Single integrated pass: each page is fetched once, extracted to markdown, and
-    its same-site links are queued. Seeded by the sitemap when available, then a
-    breadth-first crawl of links under the URL's path. Bounded by ``max_pages``
+    Pages are processed in concurrent breadth-first waves: each page is fetched
+    once, extracted to markdown, and its same-site links (under the URL's path)
+    feed the next wave. Seeded by the sitemap when present so whole guides are
+    captured even if their in-page nav is incomplete. Bounded by ``max_pages``
     and ``time_budget`` (seconds).
 
     ``progress`` is an optional callable ``(saved, cap, url)`` for UI updates.
@@ -189,20 +235,18 @@ def mirror_docs(url: str, dest_dir: str | None = None, max_pages: int = 100,
 
     dest_dir = dest_dir or mirror_dir_for(url)
     start = _norm_url(url)
-    parsed = urlparse(start)
-    host = parsed.netloc
-    prefix = _path_prefix(parsed)
+    host = urlparse(start).netloc
+    # Scope from the *original* URL: normalizing strips a trailing slash, which
+    # would otherwise turn a section root like /polaris/ into the whole site.
+    prefix = _path_prefix(urlparse(url))
 
-    session = _session()
-
-    # Seed queue: start page first, then sitemap entries (filtered to the prefix).
-    queue: list[str] = [start]
+    # Seed frontier: start page + sitemap entries (filtered to the path prefix).
     seeds = _sitemap_urls(start, host)
     if prefix and len(prefix) > 1:
         under = [u for u in seeds if urlparse(u).path.startswith(prefix)]
         if len(under) >= 3:
             seeds = under
-    queue.extend(seeds)
+    frontier = [start] + [u for u in seeds if u != start]
 
     os.makedirs(dest_dir, exist_ok=True)
     for fn in os.listdir(dest_dir):
@@ -213,47 +257,48 @@ def mirror_docs(url: str, dest_dir: str | None = None, max_pages: int = 100,
                 pass
 
     visited: set[str] = set()
-    queued: set[str] = set(queue)
+    queued: set[str] = set(frontier)
     pages: list[dict[str, str]] = []
     used: set[str] = set()
     deadline = time.time() + time_budget
 
-    while queue and len(pages) < max_pages and time.time() < deadline:
-        u = queue.pop(0)
-        if u in visited:
-            continue
-        visited.add(u)
+    pool, _kind = _make_pool(workers)
+    with pool:
+        while frontier and len(pages) < max_pages and time.time() < deadline:
+            batch = [u for u in frontier if u not in visited][: max_pages * 2]
+            visited.update(batch)
+            frontier = []
+            if not batch:
+                break
 
-        if progress:
-            progress(len(pages) + 1, max_pages, u)
-
-        html = _fetch_html(session, u)
-        if not html:
-            continue
-
-        text = _extract_markdown(traf, html)
-        if text:
-            base = slugify(urlparse(u).path or u) or f"page_{len(pages) + 1}"
-            fname = base + ".md"
-            n = 1
-            while fname in used:
-                fname = f"{base}_{n}.md"
-                n += 1
-            used.add(fname)
-            title = _page_title(traf, html)
-            with open(os.path.join(dest_dir, fname), "w") as fh:
-                # Only add a title header if the extracted markdown lacks one.
-                if title and not text.lstrip().startswith("#"):
-                    fh.write(f"# {title}\n\n")
-                fh.write(f"<!-- source: {u} -->\n\n")
-                fh.write(text)
-            pages.append({"url": u, "file": fname, "title": title})
-
-        # Enqueue newly seen same-site links.
-        for link in _extract_links(html, u, host, prefix):
-            if link not in visited and link not in queued:
-                queued.add(link)
-                queue.append(link)
+            futures = {pool.submit(_crawl_one, (u, host, prefix)): u for u in batch}
+            for fut in as_completed(futures):
+                if len(pages) >= max_pages or time.time() >= deadline:
+                    break
+                try:
+                    u, text, title, links = fut.result()
+                except Exception:
+                    continue
+                if progress:
+                    progress(len(pages) + 1, max_pages, u)
+                if text:
+                    base = slugify(urlparse(u).path or u) or f"page_{len(pages) + 1}"
+                    fname = base + ".md"
+                    n = 1
+                    while fname in used:
+                        fname = f"{base}_{n}.md"
+                        n += 1
+                    used.add(fname)
+                    with open(os.path.join(dest_dir, fname), "w") as fh:
+                        if title and not text.lstrip().startswith("#"):
+                            fh.write(f"# {title}\n\n")
+                        fh.write(f"<!-- source: {u} -->\n\n")
+                        fh.write(text)
+                    pages.append({"url": u, "file": fname, "title": title})
+                for link in links:
+                    if link not in visited and link not in queued:
+                        queued.add(link)
+                        frontier.append(link)
 
     if not pages:
         raise RuntimeError(
@@ -266,7 +311,7 @@ def mirror_docs(url: str, dest_dir: str | None = None, max_pages: int = 100,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "page_count": len(pages),
         "truncated": len(pages) >= max_pages or time.time() >= deadline,
-        "pages": pages,
+        "pages": sorted(pages, key=lambda p: p["url"]),
     }
     with open(os.path.join(dest_dir, "manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=2)
