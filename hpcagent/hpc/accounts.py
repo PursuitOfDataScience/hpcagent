@@ -1,6 +1,7 @@
-from hpchpcagent.hpc.slurm import run_cli_command, is_fatal_command_error, normalize_null, safe_int
-from collections import Counter
 import re
+from collections import Counter
+
+from hpcagent.hpc.slurm import is_fatal_command_error, run_cli_command
 
 
 def check_user_quota(user_id: str) -> str:
@@ -273,7 +274,7 @@ def check_account_jobs(account_name: str, partition: str = None) -> str:
 
 
 def check_jobs_by_node(node_name: str) -> str:
-    from hpchpcagent.hpc.nodes import check_node_hardware
+    from hpcagent.hpc.nodes import check_node_hardware
     hardware_summary = check_node_hardware(node_name)
     cmd = ["squeue", "-w", node_name]
     ok, output = run_cli_command(cmd, timeout=20)

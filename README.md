@@ -25,13 +25,13 @@ An interactive TUI agent that manages SLURM clusters — check nodes, diagnose j
 ## Quickstart
 
 ```bash
-pip install "hpchpcagent[full]"
+pip install "hpcagent[full]"
 
 # OpenAI
-hpchpcagent --backend openai --model gpt-4o --api-key "$OPENAI_API_KEY"
+hpcagent --backend openai --model gpt-4o --api-key "$OPENAI_API_KEY"
 
 # or Groq (free tier)
-hpchpcagent --backend groq --model mixtral-8x7b-32768
+hpcagent --backend groq --model mixtral-8x7b-32768
 ```
 
 Type your question — "show me all GPU jobs", "why is job 1234 pending?", "check my quota" — and the agent runs SLURM commands, reads docs, or searches the web to answer.
@@ -57,7 +57,7 @@ Type your question — "show me all GPU jobs", "why is job 1234 pending?", "chec
 
 ```bash
 # Load a skills file to give the agent access to your cluster docs
-hpchpcagent --backend openai --model gpt-4o --docs-base-path /path/to/docs
+hpcagent --backend openai --model gpt-4o --docs-base-path /path/to/docs
 ```
 
 Then in the TUI, ask "how do I request GPUs?" and the agent reads the relevant doc.
@@ -68,5 +68,5 @@ Then in the TUI, ask "how do I request GPUs?" and the agent reads the relevant d
 git clone https://github.com/PursuitOfDataScience/hpcagent.git
 cd hpcagent
 pip install -e ".[full]"
-hpchpcagent --backend openai --model gpt-4o
+hpcagent --backend openai --model gpt-4o
 ```

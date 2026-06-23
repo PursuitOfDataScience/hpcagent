@@ -1,5 +1,5 @@
-from hpchpcagent.agent import HPCAgent
-from hpchpcagent.core.llm import PROVIDER_BASE_URLS, CLI_BACKENDS
+from hpcagent.agent import HPCAgent
+from hpcagent.core.llm import CLI_BACKENDS, PROVIDER_BASE_URLS
 
 
 def main():
@@ -7,7 +7,7 @@ def main():
 
     known = sorted(PROVIDER_BASE_URLS.keys()) + sorted(CLI_BACKENDS)
 
-    parser = argparse.ArgumentParser(description="hpchpcagent — HPC AI Agent")
+    parser = argparse.ArgumentParser(description="hpcagent — HPC AI Agent")
     parser.add_argument("--backend", default=None, help=f"LLM provider ({', '.join(known)}, or 'custom')")
     parser.add_argument("--api-key", default=None, help="API key (or set <PROVIDER>_API_KEY env var)")
     parser.add_argument("--api-base-url", default=None, help="Base URL (required for custom backends)")

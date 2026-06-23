@@ -1,9 +1,24 @@
-import os, re, subprocess, sqlite3
-from hpchpcagent.hpc.slurm import (
-    normalize_null, split_csv, safe_int, extract_token, canonical_node_name,
-    normalize_node_state, merge_node_state, parse_tres_value, parse_gpu_total_from_gres,
-    is_gpu_node, detect_gpu_type, NODE_STATE_SEVERITY, GPU_HINTS, GPU_TYPE_CANDIDATES,
-    run_cli_command, BUSY_NODE_STATES, UNAVAILABLE_NODE_STATES, pct, coerce_bool,
+import os
+import sqlite3
+import subprocess
+from collections import Counter
+
+from hpcagent.hpc.slurm import (
+    BUSY_NODE_STATES,
+    NODE_STATE_SEVERITY,
+    canonical_node_name,
+    coerce_bool,
+    detect_gpu_type,
+    extract_token,
+    is_gpu_node,
+    merge_node_state,
+    normalize_node_state,
+    normalize_null,
+    parse_gpu_total_from_gres,
+    parse_tres_value,
+    pct,
+    safe_int,
+    split_csv,
 )
 
 NODE_MONITOR_DB_DEFAULT_PATH = "/project/rcc/youzhi/slurm_node_monitor.db"

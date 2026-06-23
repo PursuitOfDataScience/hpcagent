@@ -1,11 +1,22 @@
-import json, os, subprocess, sys, tempfile, threading, time, re, uuid, ast
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+import time
 from pathlib import Path
-from hpchpcagent.core.ui import (
-    Colors, ThinkingAnim, StreamRenderer, tool_status,
-    stop_animation_if_running, print_assistant_response_text, c,
-)
-from hpchpcagent.core.tools import ToolRegistry
 
+from hpcagent.core.tools import ToolRegistry
+from hpcagent.core.ui import (
+    Colors,
+    StreamRenderer,
+    ThinkingAnim,
+    c,
+    stop_animation_if_running,
+    tool_status,
+)
 
 # ── Provider registry ──────────────────────────────────────────────────────────
 
@@ -428,7 +439,7 @@ class LLMClient:
         while process.poll() is None:
             try:
                 if Path(last_message_path).exists():
-                    with open(last_message_path, 'r') as f:
+                    with open(last_message_path) as f:
                         f.seek(last_pos)
                         new_content = f.read()
                         if new_content:
@@ -445,7 +456,7 @@ class LLMClient:
 
         try:
             if Path(last_message_path).exists():
-                with open(last_message_path, 'r') as f:
+                with open(last_message_path) as f:
                     f.seek(last_pos)
                     remaining = f.read()
                     if remaining:
@@ -718,7 +729,7 @@ class LLMClient:
                         if animation and animation.running:
                             animation.stop()
                         if not prompt_label_shown:
-                            print(f"\r\033[K", end="", flush=True)
+                            print("\r\033[K", end="", flush=True)
                             print(f"{c.TEAL}{c.BOLD}\u25cf{c.RESET} ", end="", flush=True)
                             prompt_label_shown = True
                         md_renderer.process_chunk(line)
@@ -736,7 +747,7 @@ class LLMClient:
                 response = "*(empty response)*"
 
             if not prompt_label_shown:
-                print(f"\r\033[K", end="", flush=True)
+                print("\r\033[K", end="", flush=True)
                 print(f"{c.TEAL}{c.BOLD}\u25cf{c.RESET} ", end="", flush=True)
                 md_renderer.process_chunk(response)
                 md_renderer.flush()

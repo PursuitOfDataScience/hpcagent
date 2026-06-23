@@ -1,14 +1,17 @@
-import re
+from typing import Any
 from urllib.parse import urlparse
 
-from hpchpcagent.core.recency import (
-    URL_PATTERN, YEAR_PATTERN, MONTH_NAME_PATTERN, MONTH_YEAR_PATTERN,
-    RELATIVE_MONTH_YEAR_PATTERN, PREFERRED_FRESH_DOMAINS, TIME_CRITICAL_HINTS,
-    extract_years, count_current_year_hits, has_recent_date_signals,
+from hpcagent.core.recency import (
+    PREFERRED_FRESH_DOMAINS,
+    URL_PATTERN,
+    count_current_year_hits,
+    extract_years,
+    has_recent_date_signals,
     is_time_sensitive_query,
 )
+from hpcagent.core.ui import tool_status
 
-DDGS = None
+DDGS: Any = None
 try:
     from ddgs import DDGS
 except ImportError:
@@ -17,14 +20,11 @@ except ImportError:
     except ImportError:
         pass
 
-trafilatura = None
+trafilatura: Any = None
 try:
     import trafilatura
 except ImportError:
     pass
-
-from hpchpcagent.core.ui import tool_status
-
 
 def web_search(query, max_results=5, timelimit=None):
     if DDGS is None:
@@ -205,7 +205,7 @@ def build_freshness_search_query(user_query: str) -> str:
     year = datetime.now(timezone.utc).strftime("%Y")
     base_query = f"{query} latest {iso_date} {natural_date} {year}"
 
-    from hpchpcagent.core.recency import is_stock_query, is_weather_query, is_news_query
+    from hpcagent.core.recency import is_news_query, is_stock_query, is_weather_query
     if is_stock_query(query):
         return f"{base_query} dow jones nasdaq s&p 500 live reuters cnbc marketwatch yahoo finance"
     if is_weather_query(query):
@@ -217,7 +217,8 @@ def build_freshness_search_query(user_query: str) -> str:
 
 def gather_external_web_context(user_query: str):
     from datetime import datetime, timezone
-    from hpchpcagent.core.recency import is_time_sensitive_query
+
+    from hpcagent.core.recency import is_time_sensitive_query
 
     tool_status("web_search", status="running")
     search_query = build_freshness_search_query(user_query)
@@ -239,7 +240,7 @@ def gather_external_web_context(user_query: str):
     fetch_attempted = 0
     fetch_success = 0
 
-    from hpchpcagent.core.ui import c
+    from hpcagent.core.ui import c
 
     def fetch_entry_from_url(fetched_url: str):
         nonlocal fetch_status_started, fetch_attempted, fetch_success

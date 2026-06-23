@@ -1,5 +1,9 @@
-import os, re, sys, time, threading, select, shutil
-from pathlib import Path
+import re
+import select
+import shutil
+import sys
+import threading
+import time
 
 PTK_AVAILABLE = False
 try:
@@ -9,12 +13,9 @@ try:
     from prompt_toolkit.history import InMemoryHistory
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.layout import Layout
+    from prompt_toolkit.layout.containers import HSplit
     from prompt_toolkit.styles import Style
     from prompt_toolkit.widgets import Frame, TextArea
-    from prompt_toolkit.completion import Completer, Completion
-    from prompt_toolkit.filters import Condition
-    from prompt_toolkit.layout.containers import ConditionalContainer, HSplit, Window
-    from prompt_toolkit.layout.controls import FormattedTextControl
     PTK_AVAILABLE = True
 except ImportError:
     pass

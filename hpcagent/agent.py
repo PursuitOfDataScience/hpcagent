@@ -1,47 +1,50 @@
-import os, re, sys, json, time
-from datetime import datetime, timezone
+import os
+import re
 
-from hpchpcagent.core.ui import (
-    Colors, c, ThinkingAnim, StreamRenderer, tool_status, read_input,
-    print_banner, print_assistant_response_text, stop_animation_if_running,
+from hpcagent.core.config import JsonConfig
+from hpcagent.core.llm import CLI_BACKENDS, PROVIDER_BASE_URLS, LLMClient
+from hpcagent.core.tools import ToolRegistry
+from hpcagent.core.ui import (
+    c,
+    print_banner,
+    read_input,
 )
-from hpchpcagent.core.llm import LLMClient, CLI_BACKENDS, KNOWN_PROVIDERS, PROVIDER_BASE_URLS
-from hpchpcagent.core.tools import ToolRegistry
-from hpchpcagent.core.config import JsonConfig
-from hpchpcagent.core.selectors import (
-    interactive_select, interactive_select_two_phase,
-    _SELECTION_CANCELLED, _GO_BACK, _hex_to_ansi,
+from hpcagent.core.web import (
+    web_fetch,
+    web_search,
 )
-from hpchpcagent.core.web import (
-    web_search, web_fetch, gather_external_web_context,
-    build_external_web_context,
+from hpcagent.hpc.accounts import (
+    check_account_jobs,
+    check_account_members,
+    check_jobs_by_node,
+    check_jobs_by_partition,
+    check_low_balance_accounts,
+    check_pi_allocations,
+    check_pi_balance,
+    check_pi_storage,
+    check_qos_info,
+    check_recent_jobs,
+    check_su_usage,
+    check_user_jobs,
+    check_user_quota,
+    get_allocation_cycles,
+    get_current_user,
+    get_partition_info,
+    list_user_accounts,
 )
-from hpchpcagent.core.recency import (
-    is_time_sensitive_query, is_stale_for_time_sensitive_query,
-)
-from hpchpcagent.hpc.slurm import (
-    run_cli_command, is_fatal_command_error, normalize_null, safe_int,
-    TOOL_CMD_TIMEOUT,
-)
-from hpchpcagent.hpc.nodes import (
-    check_node_hardware, check_cluster_snapshot_summary,
-    check_top_gpu_utilized_nodes,
-)
-from hpchpcagent.hpc.jobs import (
-    slurm_job_exists, extend_slurm_job, get_job_details,
+from hpcagent.hpc.disk import analyze_disk_usage
+from hpcagent.hpc.docs import read_document
+from hpcagent.hpc.jobs import (
+    extend_slurm_job,
+    get_job_details,
     predict_pending_job_wait,
 )
-from hpchpcagent.hpc.accounts import (
-    check_user_quota, check_user_jobs, check_pi_balance, check_pi_allocations,
-    check_pi_storage, list_user_accounts, check_account_members, check_su_usage,
-    check_qos_info, check_recent_jobs, check_low_balance_accounts,
-    get_partition_info, check_jobs_by_partition, check_account_jobs,
-    check_jobs_by_node, get_allocation_cycles, get_current_user,
+from hpcagent.hpc.nodes import (
+    check_cluster_snapshot_summary,
+    check_node_hardware,
+    check_top_gpu_utilized_nodes,
 )
-from hpchpcagent.hpc.disk import analyze_disk_usage
-from hpchpcagent.hpc.permissions import check_path_info, manage_file_permissions
-from hpchpcagent.hpc.docs import read_document
-
+from hpcagent.hpc.permissions import check_path_info, manage_file_permissions
 
 DEFAULT_BANNER = [
     r"   ██████╗  █████╗ ██████╗ ██╗     ██╗ ██████╗",
@@ -82,7 +85,7 @@ class HPCAgent:
         self.llm = LLMClient(backend=self.backend, **llm_kwargs)
 
         # Config
-        self.config = JsonConfig(kwargs.get("config_path", "~/.hpchpcagent_config"))
+        self.config = JsonConfig(kwargs.get("config_path", "~/.hpcagent_config"))
 
         # Tool registry
         self.tools = ToolRegistry()
@@ -304,7 +307,7 @@ class HPCAgent:
         elif self.backend == 'claude':
             if not hasattr(self, '_claude_first'):
                 self._claude_first = True
-            text = self.llm.run_claude_turn(user_input, self._claude_first, self.system_prompt_append or self.system_prompt)
+            self.llm.run_claude_turn(user_input, self._claude_first, self.system_prompt_append or self.system_prompt)
             self._claude_first = False
         elif self.backend == 'agy':
             self.conversation = self.llm.run_agy_step(
@@ -373,5 +376,5 @@ class HPCAgent:
                     lambda a, n=name: self._execute_doc_tool(n, a),
                 )
 
-    def add_command_tool(self, name: str, description: str, schema: dict, handler: callable):
+    def add_command_tool(self, name: str, description: str, schema: dict, handler):
         self.tools.register(name, description, schema, handler)

@@ -1,4 +1,6 @@
-import os, re, subprocess
+import os
+import re
+import subprocess
 
 
 def parse_size_to_bytes(size_str: str) -> int:
@@ -59,21 +61,21 @@ def analyze_disk_usage(directory: str = None, max_depth: int = 1) -> str:
                 path_lower = item['path'].lower()
                 result_lines.append(f"  * {item['size_str']:<8} {item['path']}")
                 if '.cache' in path_lower or 'cache' in path_lower:
-                    result_lines.append(f"    Suggestion: cache directory - consider clearing old cache files")
+                    result_lines.append("    Suggestion: cache directory - consider clearing old cache files")
                 elif '.npm' in path_lower:
-                    result_lines.append(f"    Suggestion: npm cache - run 'npm cache clean --force' to clear")
+                    result_lines.append("    Suggestion: npm cache - run 'npm cache clean --force' to clear")
                 elif '.conda' in path_lower or 'anaconda' in path_lower or 'miniconda' in path_lower:
-                    result_lines.append(f"    Suggestion: conda environment - remove unused environments with 'conda env remove -n ENV_NAME'")
+                    result_lines.append("    Suggestion: conda environment - remove unused environments with 'conda env remove -n ENV_NAME'")
                 elif '.local' in path_lower:
-                    result_lines.append(f"    Suggestion: local packages - review and uninstall unused ones")
+                    result_lines.append("    Suggestion: local packages - review and uninstall unused ones")
                 elif 'tmp' in path_lower or '.tmp' in path_lower:
-                    result_lines.append(f"    Suggestion: temporary files - review and manually delete old temp files")
+                    result_lines.append("    Suggestion: temporary files - review and manually delete old temp files")
                 elif '__pycache__' in path_lower:
-                    result_lines.append(f"    Suggestion: python cache - safe to delete")
+                    result_lines.append("    Suggestion: python cache - safe to delete")
                 elif '.git' in path_lower:
-                    result_lines.append(f"    Suggestion: git repository data - run 'git gc' to optimize")
+                    result_lines.append("    Suggestion: git repository data - run 'git gc' to optimize")
                 elif 'node_modules' in path_lower:
-                    result_lines.append(f"    Suggestion: node modules - consider removing unused project dependencies")
+                    result_lines.append("    Suggestion: node modules - consider removing unused project dependencies")
         else:
             result_lines.append("\nNo unusually large items found (>100MB).")
         result_lines.append("\n" + "-" * 60)
@@ -83,6 +85,6 @@ def analyze_disk_usage(directory: str = None, max_depth: int = 1) -> str:
         result_lines.append("-" * 60)
         return '\n'.join(result_lines)
     except subprocess.TimeoutExpired:
-        return f"Error: Disk usage analysis timed out. The directory may be too large. Try a smaller directory or reduce max_depth."
+        return "Error: Disk usage analysis timed out. The directory may be too large. Try a smaller directory or reduce max_depth."
     except subprocess.CalledProcessError as e:
         return f"Error analyzing disk usage: {e.output if hasattr(e, 'output') else str(e)}"

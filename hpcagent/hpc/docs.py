@@ -6,7 +6,7 @@ def read_document(file_path: str, base_path: str = None) -> str:
         return "Error: base_path is required. Set it to your documentation root."
     full_path = os.path.join(base_path, file_path)
     try:
-        with open(full_path, 'r', encoding='utf-8') as f:
+        with open(full_path, encoding='utf-8') as f:
             content = f.read()
         if len(content) > 15000:
             content = content[:15000] + "\n\n[... Document truncated due to length ...]"

@@ -1,12 +1,18 @@
-from hpchpcagent.hpc.slurm import (
-    normalize_null, safe_int, split_csv, extract_token, canonical_node_name,
-    normalize_node_state, merge_node_state, parse_tres_value, parse_gpu_total_from_gres,
-    is_gpu_node, detect_gpu_type, NODE_STATE_SEVERITY, BUSY_NODE_STATES, UNAVAILABLE_NODE_STATES,
-    parse_mem_to_mb, parse_tres_memory_mb, parse_slurm_time_to_minutes, percentile,
-    normalize_partition_name, gpu_type_matches, run_cli_command, is_fatal_command_error,
-    TOOL_CMD_TIMEOUT,
+from hpcagent.hpc.nodes import fetch_cluster_nodes
+from hpcagent.hpc.slurm import (
+    UNAVAILABLE_NODE_STATES,
+    extract_token,
+    gpu_type_matches,
+    normalize_node_state,
+    normalize_null,
+    normalize_partition_name,
+    parse_mem_to_mb,
+    parse_slurm_time_to_minutes,
+    parse_tres_memory_mb,
+    percentile,
+    run_cli_command,
+    safe_int,
 )
-from hpchpcagent.hpc.nodes import fetch_cluster_nodes
 
 
 def parse_requested_gpu_spec(text: str) -> tuple:
@@ -61,7 +67,7 @@ def slurm_job_exists(job_id: str) -> bool:
     ok, out = run_cli_command(["scontrol", "show", "job", job_id], timeout=20)
     if not ok:
         return False
-    return bool(__import__('re').search(r"JobId\s*=\s*{}".format(job_id), out))
+    return bool(__import__('re').search(rf"JobId\s*=\s*{job_id}", out))
 
 
 def extend_slurm_job(job_id: str, time_limit: str) -> str:
@@ -222,7 +228,7 @@ def estimate_pending_job_wait_minutes(nodes_required: int, runnable_now_nodes: i
 
 
 def predict_pending_job_wait(job_id: str, use_scontrol: bool = True) -> str:
-    from hpchpcagent.hpc.slurm import coerce_bool
+    from hpcagent.hpc.slurm import coerce_bool
     clean_job_id = normalize_null(job_id)
     if not clean_job_id:
         return "Error: job_id is required."

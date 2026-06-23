@@ -1,5 +1,6 @@
-import os, sys, tty, termios
-
+import sys
+import termios
+import tty
 
 _SELECTION_CANCELLED = object()
 _GO_BACK = object()
@@ -20,7 +21,7 @@ def _hex_to_ansi(hexstr):
 def interactive_select(options, header="Select option", current_label="", default_idx=0,
                         display_fn=None, selected_color=None, unselected_color=None,
                         clear_on_confirm=False):
-    from hpchpcagent.core.ui import c
+    from hpcagent.core.ui import c
 
     if display_fn is None:
         display_fn = str
@@ -106,7 +107,7 @@ def interactive_select_two_phase(
     phase2_options_fn, phase2_display_fn, phase2_header_fn,
     phase2_current_label_fn, phase2_default_idx_fn,
 ):
-    from hpchpcagent.core.ui import c
+    from hpcagent.core.ui import c
 
     phase = "p1"
     i1 = phase1_default_idx
@@ -148,7 +149,7 @@ def interactive_select_two_phase(
         nonlocal phase, p2_opts, i2
         phase = "p2"
         for _ in range(P1L):
-            sys.stdout.write(f"\033[F\033[2K")
+            sys.stdout.write("\033[F\033[2K")
         p2_opts = phase2_options_fn(chosen)
         i2 = phase2_default_idx_fn()
         dp2()
@@ -156,7 +157,7 @@ def interactive_select_two_phase(
     def to_p1():
         nonlocal phase
         for _ in range(len(p2_opts) + 2):
-            sys.stdout.write(f"\033[F\033[2K")
+            sys.stdout.write("\033[F\033[2K")
         phase = "p1"
         dp1()
 
@@ -214,7 +215,7 @@ def interactive_select_two_phase(
     finally:
         n = P1L if phase == "p1" else len(p2_opts) + 2
         for _ in range(n):
-            sys.stdout.write(f"\033[F\033[2K")
+            sys.stdout.write("\033[F\033[2K")
         sys.stdout.write("\033[?25h")
         sys.stdout.flush()
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old)

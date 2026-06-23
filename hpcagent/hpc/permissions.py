@@ -1,4 +1,8 @@
-import os, subprocess, stat, pwd, grp
+import grp
+import os
+import pwd
+import stat
+import subprocess
 from datetime import datetime
 
 
@@ -42,16 +46,16 @@ def check_path_info(path: str) -> str:
                 contents = os.listdir(path)
                 result_lines.append(f"Contents:    {len(contents)} items")
             except PermissionError:
-                result_lines.append(f"Contents:    Unable to list (permission denied)")
+                result_lines.append("Contents:    Unable to list (permission denied)")
         return '\n'.join(result_lines)
     except PermissionError:
         result_lines.append(f"Direct access to '{path}' denied (Permission denied)")
-        result_lines.append(f"\nAttempting to get info from parent directory...\n")
+        result_lines.append("\nAttempting to get info from parent directory...\n")
     except FileNotFoundError:
         return f"Error: Path '{path}' does not exist."
     except Exception as e:
         result_lines.append(f"Error accessing path directly: {str(e)}")
-        result_lines.append(f"\nAttempting to get info from parent directory...\n")
+        result_lines.append("\nAttempting to get info from parent directory...\n")
 
     parent_dir = os.path.dirname(path)
     target_name = os.path.basename(path)
@@ -76,15 +80,15 @@ def check_path_info(path: str) -> str:
                 result_lines.append(f"  Group:       {group}")
                 result_lines.append(f"  Size:        {size}")
                 if perms.startswith('d'):
-                    result_lines.append(f"  Type:        Directory")
+                    result_lines.append("  Type:        Directory")
                 elif perms.startswith('l'):
-                    result_lines.append(f"  Type:        Symbolic link")
+                    result_lines.append("  Type:        Symbolic link")
                 elif perms.startswith('-'):
-                    result_lines.append(f"  Type:        Regular file")
+                    result_lines.append("  Type:        Regular file")
                 else:
-                    result_lines.append(f"  Type:        Special file")
+                    result_lines.append("  Type:        Special file")
                 if '+' in perms:
-                    result_lines.append(f"  Note:        Has ACL (Access Control List)")
+                    result_lines.append("  Note:        Has ACL (Access Control List)")
         else:
             cmd = f"ls -la {parent_dir} 2>/dev/null"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
@@ -147,7 +151,7 @@ def manage_file_permissions(path: str, group: str, permissions: str = "rX") -> s
     except Exception as e:
         return f"Error running chmod: {str(e)}"
 
-    result_lines.append(f"\nStep 3: Verifying parent directory traversal ...")
+    result_lines.append("\nStep 3: Verifying parent directory traversal ...")
     parents = []
     current = path
     while True:

@@ -1,6 +1,5 @@
-import os, re, subprocess, sqlite3
-from collections import Counter
-
+import re
+import subprocess
 
 TOOL_CMD_TIMEOUT = 25
 

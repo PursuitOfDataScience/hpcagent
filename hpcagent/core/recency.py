@@ -1,7 +1,6 @@
 import re
 from datetime import datetime, timezone
 
-
 URL_PATTERN = re.compile(r"https?://[^\s)>\]\"']+")
 YEAR_PATTERN = re.compile(r"\b(20\d{2})\b")
 MONTH_NAME_PATTERN = re.compile(

@@ -1,11 +1,10 @@
-import json
 
 
 class ToolRegistry:
     """Register named tools with JSON schemas and handler functions, then dispatch."""
 
     def __init__(self):
-        self._tools = {}  
+        self._tools = {}
         self._handlers = {}
 
     def register(self, name: str, description: str, input_schema: dict, handler: callable):
