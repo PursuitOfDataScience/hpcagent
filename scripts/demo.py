@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Self-animating hpcagent demo for recording a README GIF.
+"""Self-animating hpcpilot demo for recording a README GIF.
 
-Renders a scripted session using hpcagent's *real* UI components (banner,
+Renders a scripted session using hpcpilot's *real* UI components (banner,
 streaming markdown renderer, tool-status line), so the recording looks exactly
 like the app. Used by ``assets/demo.tape`` with `vhs`; run it directly to
 preview:  python scripts/demo.py
@@ -10,8 +10,8 @@ preview:  python scripts/demo.py
 import sys
 import time
 
-from hpcagent.agent import DEFAULT_BANNER
-from hpcagent.core.ui import StreamRenderer, c, print_banner, tool_status
+from hpcpilot.agent import DEFAULT_BANNER
+from hpcpilot.core.ui import StreamRenderer, c, print_banner, tool_status
 
 
 def _sleep(s):

@@ -1,4 +1,4 @@
-from hpcagent.hpc.slurm import (
+from hpcpilot.hpc.slurm import (
     canonical_node_name,
     coerce_bool,
     detect_gpu_type,

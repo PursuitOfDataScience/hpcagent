@@ -1,5 +1,5 @@
-from hpcagent.hpc.jobs import parse_requested_gpu_spec
-from hpcagent.hpc.disk import parse_size_to_bytes
+from hpcpilot.hpc.jobs import parse_requested_gpu_spec
+from hpcpilot.hpc.disk import parse_size_to_bytes
 
 
 def test_parse_requested_gpu_spec():

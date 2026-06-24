@@ -14,7 +14,8 @@
 A colorful terminal agent that checks nodes, diagnoses jobs, predicts wait times,
 fixes permissions, and reads your cluster's own docs — no bash incantations required.
 
-[![CI](https://github.com/PursuitOfDataScience/hpcagent/actions/workflows/ci.yml/badge.svg)](https://github.com/PursuitOfDataScience/hpcagent/actions/workflows/ci.yml)
+[![CI](https://github.com/PursuitOfDataScience/hpcpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/PursuitOfDataScience/hpcpilot/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/hpcpilot.svg)](https://pypi.org/project/hpcpilot/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 [![Status: beta](https://img.shields.io/badge/status-beta-orange.svg)](#status)
@@ -26,14 +27,14 @@ fixes permissions, and reads your cluster's own docs — no bash incantations re
 ## See it
 
 <p align="center">
-  <img src="assets/demo.gif" width="840" alt="hpcagent: diagnose a pending job, mirror the cluster's docs by URL, then answer from them">
+  <img src="assets/demo.gif" width="840" alt="hpcpilot: diagnose a pending job, mirror the cluster's docs by URL, then answer from them">
 </p>
 
 > Diagnose a pending job, mirror the cluster's docs straight from their URL, then
 > get an answer cited from them. The agent streams markdown, shows each tool as it
 > runs, and asks before anything that changes state. Type `/` any time for commands.
 
-## Why hpcagent
+## Why hpcpilot
 
 - 🗣️ **Plain-English ops** — "show my pending jobs", "who's hogging node midway3-0042", "extend job 1837465 by 2 hours".
 - 📚 **Knows *your* cluster** — point it at your docs folder **or a docs-site URL** and it mirrors the whole user guide locally, then cites the right page.
@@ -44,14 +45,14 @@ fixes permissions, and reads your cluster's own docs — no bash incantations re
 ## Quickstart
 
 ```bash
-pip install "hpcagent[full]"
+pip install "hpcpilot[full]"
 
-hpcagent          # first run walks you through setup
+hpcpilot          # first run walks you through setup
 ```
 
 That's it. On first launch a short wizard helps you pick a model, point at your
 docs, and start asking questions. If you already have the `claude` or `codex` CLI
-installed, hpcagent uses it automatically — **zero config, no API key needed.**
+installed, hpcpilot uses it automatically — **zero config, no API key needed.**
 
 ## Living in the TUI
 
@@ -73,16 +74,16 @@ Don't know a model's exact name? Just open `/model` and type `fast`, `reasoning`
 
 ## Teach it your cluster's docs
 
-Point hpcagent at a **local folder** of markdown, or at a **docs-site URL** — a whole
+Point hpcpilot at a **local folder** of markdown, or at a **docs-site URL** — a whole
 user guide with many pages. A URL is crawled once (sitemap, then the site's own nav
 links) into a local cache, so the agent reads it instantly and offline:
 
 ```bash
 # A local folder…
-hpcagent --docs-base-path /path/to/cluster-docs
+hpcpilot --docs-base-path /path/to/cluster-docs
 
 # …or mirror an online user guide (the whole site, not one page)
-hpcagent --docs-url https://docs.rcc.uchicago.edu/
+hpcpilot --docs-url https://docs.rcc.uchicago.edu/
 ```
 
 You can also paste a path or URL in the wizard's **Docs** step. Inside the TUI,
@@ -95,7 +96,7 @@ the relevant page and answers with specifics. *(URL mirroring uses the `full` ex
 The GIF above is built with [vhs](https://github.com/charmbracelet/vhs) from
 [`assets/demo.tape`](assets/demo.tape), which runs
 [`scripts/demo.py`](scripts/demo.py) — a self-animating session that uses
-hpcagent's *real* banner, streaming renderer, and tool-status output, so it looks
+hpcpilot's *real* banner, streaming renderer, and tool-status output, so it looks
 exactly like the app while staying fully reproducible (no live LLM or cluster).
 
 ```bash
@@ -108,7 +109,7 @@ Edit the questions or timing in `scripts/demo.py` and re-run to taste.
 <details>
 <summary><strong>Models & providers</strong> (click to expand)</summary>
 
-hpcagent talks to any OpenAI-compatible API, plus the Claude and Codex CLIs. It does
+hpcpilot talks to any OpenAI-compatible API, plus the Claude and Codex CLIs. It does
 **not** hard-code model names — use `/model` (or `--list-models <provider>`) to see
 what each provider currently offers and pick the latest.
 
@@ -127,7 +128,7 @@ what each provider currently offers and pick the latest.
 | Claude CLI | `claude` | uses the `claude` binary |
 | Codex CLI | `codex` | uses the `codex` binary |
 
-**API vs. CLI backends:** API backends use hpcagent's curated HPC tools (job wait
+**API vs. CLI backends:** API backends use hpcpilot's curated HPC tools (job wait
 prediction, permission checks, quota lookups, doc reading). CLI backends drive the
 external agent binary directly with its own toolset.
 
@@ -139,10 +140,10 @@ Useful flags: `--model`, `--effort {low,medium,high}`, `--docs-url`, `--docs-bas
 ## Install from source
 
 ```bash
-git clone https://github.com/PursuitOfDataScience/hpcagent.git
-cd hpcagent
+git clone https://github.com/PursuitOfDataScience/hpcpilot.git
+cd hpcpilot
 pip install -e ".[full]"
-hpcagent
+hpcpilot
 ```
 
 ## Status

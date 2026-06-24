@@ -28,10 +28,10 @@ jobs:
           pip install -e ".[dev,full]"
 
       - name: Lint with ruff
-        run: ruff check hpcagent/
+        run: ruff check hpcpilot/
 
       - name: Type check with mypy
-        run: mypy hpcagent/
+        run: mypy hpcpilot/
 
       - name: Test with pytest
-        run: python -m pytest --cov=hpcagent
+        run: python -m pytest --cov=hpcpilot

@@ -3,7 +3,7 @@ import sqlite3
 import subprocess
 from collections import Counter
 
-from hpcagent.hpc.slurm import (
+from hpcpilot.hpc.slurm import (
     BUSY_NODE_STATES,
     NODE_STATE_SEVERITY,
     canonical_node_name,

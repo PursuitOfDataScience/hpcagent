@@ -2,7 +2,7 @@ import re
 import shutil
 from collections import Counter
 
-from hpcagent.hpc.slurm import is_fatal_command_error, run_cli_command
+from hpcpilot.hpc.slurm import is_fatal_command_error, run_cli_command
 
 # Configuration variables injected from self.config at runtime
 ACCOUNT_PREFIX = "pi-"
@@ -311,7 +311,7 @@ def check_account_jobs(account_name: str, partition: str | None = None) -> str:
 
 
 def check_jobs_by_node(node_name: str) -> str:
-    from hpcagent.hpc.nodes import check_node_hardware
+    from hpcpilot.hpc.nodes import check_node_hardware
     hardware_summary = check_node_hardware(node_name)
     count_cmd = ["squeue", "-h", "-w", node_name, "-o", "%i"]
     ok_count, out_count = run_cli_command(count_cmd, timeout=20)

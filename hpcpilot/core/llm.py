@@ -9,8 +9,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from hpcagent.core.tools import ToolRegistry, ToolRisk
-from hpcagent.core.ui import (
+from hpcpilot.core.tools import ToolRegistry, ToolRisk
+from hpcpilot.core.ui import (
     Colors,
     StreamRenderer,
     ThinkingAnim,
@@ -92,7 +92,7 @@ REASONING_EFFORT_MODELS = {"o3", "o4-mini", "deepseek-reasoner"}
 
 
 def get_cached_models(provider: str) -> list | None:
-    cache_dir = os.path.expanduser("~/.cache/hpcagent")
+    cache_dir = os.path.expanduser("~/.cache/hpcpilot")
     cache_file = os.path.join(cache_dir, f"models-{provider}.json")
     if os.path.exists(cache_file):
         try:
@@ -106,7 +106,7 @@ def get_cached_models(provider: str) -> list | None:
 
 
 def cache_models(provider: str, models: list):
-    cache_dir = os.path.expanduser("~/.cache/hpcagent")
+    cache_dir = os.path.expanduser("~/.cache/hpcpilot")
     try:
         os.makedirs(cache_dir, exist_ok=True)
         cache_file = os.path.join(cache_dir, f"models-{provider}.json")

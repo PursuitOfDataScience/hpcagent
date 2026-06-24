@@ -1,8 +1,8 @@
 import os
 import sys
 
-from hpcagent.agent import HPCAgent
-from hpcagent.core.llm import (
+from hpcpilot.agent import HPCPilot
+from hpcpilot.core.llm import (
     CLI_BACKENDS,
     PROVIDER_BASE_URLS,
     PROVIDER_DEFAULT_MODELS,
@@ -17,7 +17,7 @@ def main():
 
     known = sorted(PROVIDER_BASE_URLS.keys()) + sorted(CLI_BACKENDS)
 
-    parser = argparse.ArgumentParser(description="hpcagent — HPC AI Agent")
+    parser = argparse.ArgumentParser(description="hpcpilot — HPC AI Agent")
     parser.add_argument("--backend", default=None, help=f"LLM provider ({', '.join(known)}, or 'custom')")
     parser.add_argument("--api-key", default=None, help="API key (or set <PROVIDER>_API_KEY env var)")
     parser.add_argument("--api-base-url", default=None, help="Base URL (required for custom backends)")
@@ -41,9 +41,9 @@ def main():
     if args.version:
         try:
             from importlib.metadata import version as imv
-            print(f"hpcagent {imv('hpcagent')}")
+            print(f"hpcpilot {imv('hpcpilot')}")
         except Exception:
-            print("hpcagent 0.1.0")
+            print("hpcpilot 0.1.0")
         sys.exit(0)
 
     if args.list_models:
@@ -68,7 +68,7 @@ def main():
         sys.exit(0)
 
     if args.list_tools:
-        agent = HPCAgent(**{"backend": "opencode", "api_key": ""})
+        agent = HPCPilot(**{"backend": "opencode", "api_key": ""})
         print("Registered HPC tools:")
         for schema in agent.tools.get_schemas():
             risk = agent.tools.get_risk(schema["name"]).value if hasattr(agent.tools, "get_risk") else "read-only"
@@ -89,11 +89,11 @@ def main():
             print(f"Error: system prompt file not found: {args.system_prompt}", file=sys.stderr)
             sys.exit(1)
 
-    agent = HPCAgent(**kwargs)
+    agent = HPCPilot(**kwargs)
 
     # A --docs-url was passed: use the existing mirror if present, else build it.
     if args.docs_url:
-        from hpcagent.core.docfetch import load_manifest, mirror_dir_for
+        from hpcpilot.core.docfetch import load_manifest, mirror_dir_for
         dest = mirror_dir_for(args.docs_url)
         if load_manifest(dest):
             agent.docs_url = args.docs_url

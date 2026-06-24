@@ -1,7 +1,7 @@
-# hpcagent demo — render with:  vhs assets/demo.tape   (produces assets/demo.gif)
+# hpcpilot demo — render with:  vhs assets/demo.tape   (produces assets/demo.gif)
 # Requires https://github.com/charmbracelet/vhs  (conda: vhs ttyd ffmpeg)
 #
-# The session is driven by scripts/demo.py, which self-animates using hpcagent's
+# The session is driven by scripts/demo.py, which self-animates using hpcpilot's
 # real UI components (banner, streaming markdown, tool-status), so the GIF looks
 # exactly like the app while staying fully reproducible (no live LLM/cluster).
 

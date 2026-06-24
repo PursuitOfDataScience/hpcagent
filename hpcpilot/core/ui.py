@@ -28,7 +28,7 @@ except ImportError:
 HISTORY: Any = None
 
 if PTK_AVAILABLE:
-    history_path = os.path.expanduser("~/.local/state/hpcagent/history")
+    history_path = os.path.expanduser("~/.local/state/hpcpilot/history")
     try:
         os.makedirs(os.path.dirname(history_path), exist_ok=True)
         HISTORY = FileHistory(history_path)

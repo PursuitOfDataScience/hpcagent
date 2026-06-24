@@ -3,7 +3,7 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hpcagent"
+name = "hpcpilot"
 version = "0.1.0"
 description = "Agnostic HPC AI Agent framework — multi-backend LLM, SLURM tools, terminal UI"
 requires-python = ">=3.10"
@@ -33,9 +33,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/PursuitOfDataScience/hpcagent"
-Repository = "https://github.com/PursuitOfDataScience/hpcagent.git"
-Issues = "https://github.com/PursuitOfDataScience/hpcagent/issues"
+Homepage = "https://github.com/PursuitOfDataScience/hpcpilot"
+Repository = "https://github.com/PursuitOfDataScience/hpcpilot.git"
+Issues = "https://github.com/PursuitOfDataScience/hpcpilot/issues"
 
 [project.optional-dependencies]
 full = [
@@ -55,7 +55,7 @@ dev = [
 ]
 
 [project.scripts]
-hpcagent = "hpcagent.__main__:main"
+hpcpilot = "hpcpilot.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

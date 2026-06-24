@@ -18,7 +18,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
-DOCS_CACHE_ROOT = os.path.expanduser("~/.cache/hpcagent/docs")
+DOCS_CACHE_ROOT = os.path.expanduser("~/.cache/hpcpilot/docs")
 
 DEFAULT_MAX_PAGES = 400
 DEFAULT_TIME_BUDGET = 300
@@ -33,7 +33,7 @@ _SKIP_EXT = (
     ".mp3", ".wav", ".json", ".xml", ".csv", ".txt", ".rss", ".atom",
 )
 
-_UA = "hpcagent-docs/0.1 (+local docs mirror)"
+_UA = "hpcpilot-docs/0.1 (+local docs mirror)"
 
 
 def _load_trafilatura():
@@ -230,7 +230,7 @@ def mirror_docs(url: str, dest_dir: str | None = None, max_pages: int = DEFAULT_
     if traf is None:
         raise RuntimeError(
             "The 'trafilatura' package is required to mirror docs from a URL. "
-            "Install with: pip install trafilatura  (or: pip install 'hpcagent[full]')"
+            "Install with: pip install trafilatura  (or: pip install 'hpcpilot[full]')"
         )
 
     dest_dir = dest_dir or mirror_dir_for(url)

@@ -1,6 +1,6 @@
-# hpcagent — Issues, Bugs & Improvement Plan
+# hpcpilot — Issues, Bugs & Improvement Plan
 
-> Goal: turn `hpcagent` into a genuinely **cluster-agnostic, batteries-included AI harness** that any HPC user can install, configure (their model / agent / docs / system prompt), and *talk to* — no bash knowledge required — with an onboarding and TUI experience on par with OpenCode / Claude Code.
+> Goal: turn `hpcpilot` into a genuinely **cluster-agnostic, batteries-included AI harness** that any HPC user can install, configure (their model / agent / docs / system prompt), and *talk to* — no bash knowledge required — with an onboarding and TUI experience on par with OpenCode / Claude Code.
 >
 > This document is an audit + roadmap. **No code has been changed.** It catalogs (A) bugs in the current code, (B) the design gaps that block the "agnostic, preconfigurable" vision, and (C) concrete recommendations for the three questions you raised: *model selection when users don't know model names*, *API-key trust*, and *UX*.
 >
@@ -13,7 +13,7 @@
 1. **Command injection + unconfirmed destructive ops** in `hpc/permissions.py` (`shell=True` with f-string interpolation; recursive `chgrp -R`/`chmod -R` and silent parent-dir `chmod` with no confirmation). This is LLM-driven, so it is also **prompt-injectable**. → §1.1, §1.2
 2. **The system prompt is empty by default** (`agent.py:72`). The model doesn't know it's an HPC agent, doesn't know the date, the tools, or the cluster. The reference had a full prompt. **[REGRESSION]** → §2.1
 3. **Model selection is static & stale; the reference's live model discovery (`/v1/models`, `opencode models`) was dropped.** This is *exactly* the "users don't know the model name" problem — and the solution already existed. **[REGRESSION]** → §6
-4. **API keys are written to `~/.hpcagent_config` in plaintext, silently, with default permissions**, including keys *scraped out of the user's `.bashrc`*. On a shared HPC filesystem this is a real credential-leak risk and directly undermines user trust. → §1.3, §7
+4. **API keys are written to `~/.hpcpilot_config` in plaintext, silently, with default permissions**, including keys *scraped out of the user's `.bashrc`*. On a shared HPC filesystem this is a real credential-leak risk and directly undermines user trust. → §1.3, §7
 5. **The "agnostic" claim is false today** — the tool layer is hardwired to one site (RCC/UChicago: `rcchelp`, `accounts`, `pi-` prefix, `/project/rcc/youzhi/slurm_node_monitor.db`). A new cluster cannot use this without editing Python. → §5
 
 ---
@@ -37,7 +37,7 @@
 **Fix:** introduce a **tool risk classification** (read-only vs. mutating vs. destructive) and require explicit user confirmation (or a `--yes`/auto-approve allowlist) before any mutating tool runs — see §8.4. Default `manage_file_permissions` to a dry-run that prints the exact commands and a before/after, and only execute on confirmation.
 
 ### 1.3 API keys persisted in plaintext, silently — **[CRITICAL]**
-- `JsonConfig.save()` (`config.py:20-23`) writes `~/.hpcagent_config` with the process umask (typically world-readable-ish; **no `chmod 0600`**).
+- `JsonConfig.save()` (`config.py:20-23`) writes `~/.hpcpilot_config` with the process umask (typically world-readable-ish; **no `chmod 0600`**).
 - The setup wizard writes the API key into that file (`agent.py:349, 352, 361`) with no consent and no warning.
 - `_scan_shell_configs()` (`agent.py:276-299`) reads `~/.bashrc`, `~/.zshrc`, `~/.profile`, `~/.bash_profile`, `~/.zshenv`, regex-extracts every `*_API_KEY`, and the wizard then **copies the discovered key into the plaintext config** (`agent.py:347-349`).
 
@@ -84,7 +84,7 @@ So `codex_state['conv']` becomes `([], "...")` instead of a message list. The `c
 ### 2.4 Default model is never actually applied (zero-arg run is broken for API backends) — **[HIGH]**
 - `self.model = kwargs.get("model") or self.config.get("model") or os.environ.get("OPENCODE_MODEL", "")` (`agent.py:80`) → `""` when nothing is set.
 - `PROVIDER_MODEL_HINTS["opencode"] = "deepseek-v4-flash-free"` (`llm.py:44`) is only used as a *placeholder hint string* in the wizard (`agent.py:376`), never as a real default.
-- Commit `ca3fa01` claims "hpcagent works with zero args: defaults to opencode/deepseek-v4-flash-free", but with `model=""` the payload sends `"model": ""` (`llm.py:153`) → API error.
+- Commit `ca3fa01` claims "hpcpilot works with zero args: defaults to opencode/deepseek-v4-flash-free", but with `model=""` the payload sends `"model": ""` (`llm.py:153`) → API error.
 - Compounding this: `_needs_setup()` (`agent.py:264-273`) returns `True` for `opencode` when `OPENCODE_API_KEY` is unset, so a true zero-arg run actually drops into the wizard rather than "just working".
 
 **Fix:** give each provider a real `default_model` in the registry and fall back to it; reconcile the "works with zero args" claim with `_needs_setup` (either opencode free tier needs no key — then don't force setup — or it does — then say so).
@@ -111,7 +111,7 @@ After tool calls, `run_chat_step` writes `m["reasoning_content"] = reasoning_con
 
 ### 2.10 Setup wizard crashes on a non-TTY (and on import on non-POSIX) — **[HIGH]**
 - `core/selectors.py` imports `termios`/`tty` at module top (`:1-3`) and `interactive_select` calls `termios.tcgetattr(sys.stdin)` (`:50`). On any non-tty stdin (pipe, CI, some IDE terminals, `nohup`) this raises, and the wizard is invoked **outside** the `try/except` in `run()` (`agent.py:410-413`) → hard crash before the REPL starts.
-- `import termios` fails at import time on Windows, so even importing `hpcagent.core.selectors` (hence `hpcagent.agent`) errors out there, despite the package being pip-installable anywhere.
+- `import termios` fails at import time on Windows, so even importing `hpcpilot.core.selectors` (hence `hpcpilot.agent`) errors out there, despite the package being pip-installable anywhere.
 
 **Fix:** guard interactive selection behind `sys.stdin.isatty()` with a plain-text fallback (like `read_input` already does for prompt_toolkit); lazy-import `termios`; provide a non-interactive config path (flags / env / config file) so setup never *requires* a TTY.
 
@@ -125,7 +125,7 @@ After tool calls, `run_chat_step` writes `m["reasoning_content"] = reasoning_con
 - **No conversation/context-window management** (`llm.py:252-253, 342-343`): full history is re-sent every turn with no truncation/summarization. Long HPC sessions will hit context limits → 400s and rising cost. Add token-budgeted trimming or summary compaction.
 - **No retry/backoff on the HTTP path** for 429/5xx (`llm.py:164-242`). The codex path retries transient errors (`llm.py:542-545`) but the primary OpenAI-compatible path does not. Add bounded exponential backoff + `Retry-After` handling.
 - **Hardcoded `temperature: 0.7`** (`llm.py:156`) and unconditional `reasoning_effort` (`:160-161`). Reasoning models (OpenAI `o3`/`o4-mini`, `deepseek-reasoner`) reject or ignore `temperature`, and `reasoning_effort` is not universally accepted on `/chat/completions`. The reference had `_clamp_opencode_effort` / per-model effort discovery — **[REGRESSION]**. Make sampling params provider/model-aware.
-- **Claude CLI `-c` is a *global* "continue most recent"** (`llm.py:587`): `claude -c` resumes the latest conversation in the cwd, not a session bound to this process. Two hpcagent sessions (or a prior manual `claude` run) in the same dir collide. Use explicit `--resume <session-id>` captured from the first turn's `result` event.
+- **Claude CLI `-c` is a *global* "continue most recent"** (`llm.py:587`): `claude -c` resumes the latest conversation in the cwd, not a session bound to this process. Two hpcpilot sessions (or a prior manual `claude` run) in the same dir collide. Use explicit `--resume <session-id>` captured from the first turn's `result` event.
 - **Unverified Claude CLI flags**: `--effort` (`llm.py:582,586`) and `--include-partial-messages` (`:576`) are passed unconditionally; if a given Claude CLI version doesn't support `--effort`, the process errors out. Feature-detect (`claude --help`) or guard.
 - **`extend_slurm_job` error text is misleading** (`jobs.py:73-75`): "does not exist or is not yours" — but `scontrol show job` shows other users' jobs too, so the existence check doesn't prove ownership, and the real failure (insufficient privilege) is hidden. Also it's a mutation with no confirmation (see §1.2).
 - **`get_partition_info` shells out to `rcchelp`** (`accounts.py:158-160`) — site-specific (see §5).
@@ -145,7 +145,7 @@ After tool calls, `run_chat_step` writes `m["reasoning_content"] = reasoning_con
 - **README ↔ reality drift:** README provider table (`README:41-54`) lists `github`, `agy`, `custom` as first-class; the code doesn't fully support them (§2.2). Quickstart shows `--backend groq` with no key while the table says `GROQ_API_KEY` is required.
 - **`opencode` model list is empty** (`llm.py:60`) and the other `PROVIDER_MODELS` are stale (e.g. `gpt-4o`-era OpenAI list, `grok-2`, `mixtral-8x7b`); they'll rot. → solved by dynamic discovery (§6).
 - **No `--version`, `--effort`, `--list-models`, `--list-tools`, `--config-path` CLI flags**; argparse surface is minimal (`__main__.py`). `reasoning_effort` can't be set from the CLI at all, yet the banner advertises it (`agent.py:419`).
-- **Local artifact hygiene:** the working tree contains `.ruff_cache/`, `.mypy_cache/`, and `hpcagent.egg-info/`. They are correctly git-ignored (not tracked), so this is cosmetic, but a `make clean` / pre-commit cleanup target would keep the tree tidy.
+- **Local artifact hygiene:** the working tree contains `.ruff_cache/`, `.mypy_cache/`, and `hpcpilot.egg-info/`. They are correctly git-ignored (not tracked), so this is cosmetic, but a `make clean` / pre-commit cleanup target would keep the tree tidy.
 
 ---
 
@@ -168,11 +168,11 @@ A different cluster cannot use any of the account/quota/partition tooling withou
 
 ## 6. Model selection — "users don't know the exact model name"
 
-This is the right problem to worry about, and **the reference already solved it** (`~/LLM-API/agent.py`): `_fetch_models_cli()` runs `opencode models`, `_fetch_models_http()` does `GET {API_BASE_URL}/models`, `list_opencode_models()` / `_validate_opencode_model()` validate the choice, and `_fetch_opencode_model_efforts()` discovers which efforts a model supports. **All of this was dropped** in `hpcagent`, replaced by static `PROVIDER_MODELS` lists (`llm.py:53-61`) that are already stale and empty for opencode. **[REGRESSION]**
+This is the right problem to worry about, and **the reference already solved it** (`~/LLM-API/agent.py`): `_fetch_models_cli()` runs `opencode models`, `_fetch_models_http()` does `GET {API_BASE_URL}/models`, `list_opencode_models()` / `_validate_opencode_model()` validate the choice, and `_fetch_opencode_model_efforts()` discovers which efforts a model supports. **All of this was dropped** in `hpcpilot`, replaced by static `PROVIDER_MODELS` lists (`llm.py:53-61`) that are already stale and empty for opencode. **[REGRESSION]**
 
 ### Recommended approach (layered, "you don't need to know the name")
 
-1. **Live discovery first.** Almost every OpenAI-compatible provider exposes `GET /v1/models`. On entering the model step, fetch the catalog with the just-entered key and present the *actual* available models. For `opencode`, also support `opencode models` via CLI (per `~/LLM-API/opencode.md`). Cache results (e.g. `~/.cache/hpcagent/models-<provider>.json`, TTL ~24h) so the menu is instant and works offline.
+1. **Live discovery first.** Almost every OpenAI-compatible provider exposes `GET /v1/models`. On entering the model step, fetch the catalog with the just-entered key and present the *actual* available models. For `opencode`, also support `opencode models` via CLI (per `~/LLM-API/opencode.md`). Cache results (e.g. `~/.cache/hpcpilot/models-<provider>.json`, TTL ~24h) so the menu is instant and works offline.
 2. **Fuzzy / searchable picker.** Don't make users scroll 200 models. Provide type-to-filter (the TUI already has prompt_toolkit) over the discovered list, with provider + context-window + (if available) pricing shown.
 3. **Semantic aliases / tiers** so a user can say what they *want*, not the SKU:
    - `fast` / `cheap` / `smart` / `reasoning` / `vision` / `free` → resolve to the best current model for that provider. (e.g. "smart" → top frontier model; "free" → a `*-free` opencode model.)
@@ -191,7 +191,7 @@ This turns model selection from "memorize an exact SKU" into "search, or pick a 
 This is a legitimate concern, especially on shared HPC. The current design is the *worst* case for trust: it **silently copies secrets into a plaintext file** (incl. keys scraped from `.bashrc`), with no consent and default perms (§1.3). Here's a trust-first model.
 
 ### Threat model to state plainly (in docs + wizard)
-- `hpcagent` is a local Python process. It sends your key only to the provider endpoint you choose (over HTTPS). It does not phone home.
+- `hpcpilot` is a local Python process. It sends your key only to the provider endpoint you choose (over HTTPS). It does not phone home.
 - The real risks are (a) a secret written to disk on a shared/backed-up filesystem, and (b) a secret echoed to a terminal/log. Design to minimize both.
 
 ### Resolution order (read), with consent (write)
@@ -199,7 +199,7 @@ This is a legitimate concern, especially on shared HPC. The current design is th
 2. **Existing trusted tool configs**, *referenced not copied*: e.g. detect that `opencode`/`codex`/`claude` are already logged in and reuse their auth without ever reading the raw secret into our config. (For CLI backends we already shell out — lean on their own credential store.)
 3. **OS keyring** (optional dep, e.g. `keyring`): store under a service name, retrieve at runtime. Never on disk in plaintext.
 4. **Session-only**: "Use this key just for this session, don't save" — held in memory, never written. Make this the *default* choice in the wizard.
-5. **Encrypted/0600 file, only with explicit consent**: if the user opts to persist, write `~/.config/hpcagent/credentials` (XDG), `chmod 0600`, and store **separately from non-secret config**. Ideally store a reference (`{"openai": {"source": "env:OPENAI_API_KEY"}}` or `{"source":"keyring"}`) rather than the literal secret.
+5. **Encrypted/0600 file, only with explicit consent**: if the user opts to persist, write `~/.config/hpcpilot/credentials` (XDG), `chmod 0600`, and store **separately from non-secret config**. Ideally store a reference (`{"openai": {"source": "env:OPENAI_API_KEY"}}` or `{"source":"keyring"}`) rather than the literal secret.
 
 ### On the `.bashrc` auto-detect feature specifically
 Auto-detect is a nice UX, but:
@@ -210,7 +210,7 @@ Auto-detect is a nice UX, but:
 ### Always
 - `chmod 0600` anything secret; never world/group-readable on HPC.
 - Redact in all output/logs (show provider + last-4 at most, or nothing).
-- A `hpcagent logout` / `--forget-key` command to wipe stored creds.
+- A `hpcpilot logout` / `--forget-key` command to wipe stored creds.
 - Be explicit in the UI about *where* a key will go and *whether* it persists, every time.
 
 ---
@@ -240,11 +240,11 @@ Add the table-stakes set, OpenCode-style, with the existing fuzzy slash menu (`u
 - Use display-width-aware table layout (`fmt_table` measures `len()`, which misaligns on CJK/emoji — `ui.py:208-212`).
 - Respect `NO_COLOR` / non-tty (no ANSI when piped) — gate color + banner (§3, §2.10).
 - Add a persistent status line (model · effort · token usage · elapsed) like OpenCode.
-- Persist input **history across sessions** (currently `InMemoryHistory`, `ui.py:27` — lost on exit). Write to `~/.local/state/hpcagent/history`.
+- Persist input **history across sessions** (currently `InMemoryHistory`, `ui.py:27` — lost on exit). Write to `~/.local/state/hpcpilot/history`.
 
 ### 8.6 Discoverability & extensibility
 - `--list-tools` and an in-TUI `/tools` so users learn what they can ask.
-- A simple **plugin mechanism** for adding site tools without forking (drop a module in `~/.config/hpcagent/plugins/` that registers tools via the existing `ToolRegistry`). `register_hooks` already hints at this (`agent.py:107`) — wire it to a real discovery path.
+- A simple **plugin mechanism** for adding site tools without forking (drop a module in `~/.config/hpcpilot/plugins/` that registers tools via the existing `ToolRegistry`). `register_hooks` already hints at this (`agent.py:107`) — wire it to a real discovery path.
 
 ---
 
@@ -253,7 +253,7 @@ Add the table-stakes set, OpenCode-style, with the existing fuzzy slash menu (`u
 You want users to preconfigure *their* model, agent persona, docs, and cluster specifics before use. Today configuration is ad-hoc (a flat JSON of a few keys + CLI flags). Recommendations:
 
 ### 9.1 A real, documented config schema (XDG path)
-Move from `~/.hpcagent_config` (a dotfile in `$HOME`) to `~/.config/hpcagent/config.{toml,yaml,json}` with a documented schema:
+Move from `~/.hpcpilot_config` (a dotfile in `$HOME`) to `~/.config/hpcpilot/config.{toml,yaml,json}` with a documented schema:
 ```
 provider, model (or alias), effort, api_key_source (env|keyring|session|file)
 cluster: { name, scheduler, account_convention, snapshot_db }
@@ -274,8 +274,8 @@ Wire `load_skills` (§2.7) to a configured `skills_file`/`docs.base_path` at sta
 ### 9.4 System prompt templating
 Ship a default HPC system prompt (§2.1) with template variables (`{cluster_name}`, `{scheduler}`, `{today}`, `{tool_list}`, `{username}`) filled at runtime, plus an easy override/append from config. This is what lets a user "set up their own agent" without code.
 
-### 9.5 `hpcagent init`
-A scaffolding command that writes a starter config + example `skills.md` + example site-command templates into `~/.config/hpcagent/`, then runs the wizard. Mirrors `opencode`/`gh`/`aws configure` ergonomics.
+### 9.5 `hpcpilot init`
+A scaffolding command that writes a starter config + example `skills.md` + example site-command templates into `~/.config/hpcpilot/`, then runs the wizard. Mirrors `opencode`/`gh`/`aws configure` ergonomics.
 
 ---
 

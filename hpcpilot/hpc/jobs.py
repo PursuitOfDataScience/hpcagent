@@ -1,5 +1,5 @@
-from hpcagent.hpc.nodes import fetch_cluster_nodes
-from hpcagent.hpc.slurm import (
+from hpcpilot.hpc.nodes import fetch_cluster_nodes
+from hpcpilot.hpc.slurm import (
     UNAVAILABLE_NODE_STATES,
     extract_token,
     gpu_type_matches,
@@ -228,7 +228,7 @@ def estimate_pending_job_wait_minutes(nodes_required: int, runnable_now_nodes: i
 
 
 def predict_pending_job_wait(job_id: str, use_scontrol: bool = True) -> str:
-    from hpcagent.hpc.slurm import coerce_bool
+    from hpcpilot.hpc.slurm import coerce_bool
     clean_job_id = normalize_null(job_id)
     if not clean_job_id:
         return "Error: job_id is required."

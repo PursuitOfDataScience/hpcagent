@@ -2,9 +2,9 @@ import os
 import re
 from datetime import datetime, timezone
 
-from hpcagent.core.config import JsonConfig
-from hpcagent.core.docfetch import is_url, load_manifest, mirror_dir_for, mirror_docs
-from hpcagent.core.llm import (
+from hpcpilot.core.config import JsonConfig
+from hpcpilot.core.docfetch import is_url, load_manifest, mirror_dir_for, mirror_docs
+from hpcpilot.core.llm import (
     CLI_BACKENDS,
     PROVIDER_BASE_URLS,
     PROVIDER_DEFAULT_MODELS,
@@ -15,20 +15,20 @@ from hpcagent.core.llm import (
     discover_models,
     validate_model_choice,
 )
-from hpcagent.core.selectors import _SELECTION_CANCELLED, interactive_select
-from hpcagent.core.tools import ToolRegistry, ToolRisk
-from hpcagent.core.ui import (
+from hpcpilot.core.selectors import _SELECTION_CANCELLED, interactive_select
+from hpcpilot.core.tools import ToolRegistry, ToolRisk
+from hpcpilot.core.ui import (
     _INPUT_GO_BACK,
     SLASH_MENU,
     c,
     print_banner,
     read_input,
 )
-from hpcagent.core.web import (
+from hpcpilot.core.web import (
     web_fetch,
     web_search,
 )
-from hpcagent.hpc.accounts import (
+from hpcpilot.hpc.accounts import (
     check_account_jobs,
     check_account_members,
     check_jobs_by_node,
@@ -47,32 +47,32 @@ from hpcagent.hpc.accounts import (
     get_partition_info,
     list_user_accounts,
 )
-from hpcagent.hpc.disk import analyze_disk_usage
-from hpcagent.hpc.docs import read_document
-from hpcagent.hpc.jobs import (
+from hpcpilot.hpc.disk import analyze_disk_usage
+from hpcpilot.hpc.docs import read_document
+from hpcpilot.hpc.jobs import (
     extend_slurm_job,
     get_job_details,
     predict_pending_job_wait,
 )
-from hpcagent.hpc.nodes import (
+from hpcpilot.hpc.nodes import (
     check_cluster_snapshot_summary,
     check_node_hardware,
     check_top_gpu_utilized_nodes,
 )
-from hpcagent.hpc.permissions import check_path_info, manage_file_permissions
+from hpcpilot.hpc.permissions import check_path_info, manage_file_permissions
 
 _CUSTOM_MODEL_ENTRY = "✎  Enter a custom name / alias…"
 
 DEFAULT_BANNER = [
-    "██╗  ██╗██████╗  ██████╗     █████╗  ██████╗ ███████╗███╗   ██╗████████╗",
-    "██║  ██║██╔══██╗██╔════╝    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝",
-    "███████║██████╔╝██║         ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   ",
-    "██╔══██║██╔═══╝ ██║         ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ",
-    "██║  ██║██║     ╚██████╗    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ",
-    "╚═╝  ╚═╝╚═╝      ╚═════╝    ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ",
+    '██╗  ██╗██████╗  ██████╗        ██████╗ ██╗██╗      ██████╗ ████████╗',
+    '██║  ██║██╔══██╗██╔════╝        ██╔══██╗██║██║     ██╔═══██╗╚══██╔══╝',
+    '███████║██████╔╝██║             ██████╔╝██║██║     ██║   ██║   ██║   ',
+    '██╔══██║██╔═══╝ ██║             ██╔═══╝ ██║██║     ██║   ██║   ██║   ',
+    '██║  ██║██║     ╚██████╗        ██║     ██║███████╗╚██████╔╝   ██║   ',
+    '╚═╝  ╚═╝╚═╝      ╚═════╝        ╚═╝     ╚═╝╚══════╝ ╚═════╝    ╚═╝   ',
 ]
 
-DEFAULT_SYSTEM_PROMPT = """You are hpcagent, an AI assistant specialized in High-Performance Computing (HPC) cluster operations. You help users manage SLURM jobs, check cluster status, manage files, and answer questions about the cluster.
+DEFAULT_SYSTEM_PROMPT = """You are hpcpilot, an AI assistant specialized in High-Performance Computing (HPC) cluster operations. You help users manage SLURM jobs, check cluster status, manage files, and answer questions about the cluster.
 
 Current date: {today}
 User: {username}
@@ -136,13 +136,13 @@ def copy_to_clipboard(text: str) -> bool:
     return False
 
 
-class HPCAgent:
+class HPCPilot:
     """Batteries-included HPC AI Agent."""
 
     def __init__(self, **kwargs):
         # Config file — load saved settings, CLI args override
-        default_config_path = "~/.config/hpcagent/config.json"
-        legacy_config_path = "~/.hpcagent_config"
+        default_config_path = "~/.config/hpcpilot/config.json"
+        legacy_config_path = "~/.hpcpilot_config"
         config_path = kwargs.get("config_path")
         if not config_path:
             if os.path.exists(os.path.expanduser(legacy_config_path)) and not os.path.exists(os.path.expanduser(default_config_path)):
@@ -160,7 +160,7 @@ class HPCAgent:
         self.banner_subtitle = kwargs.get("banner_subtitle", "")
 
         self.backend = (kwargs.get("backend") or self.config.get("backend")
-                        or os.environ.get("HPCAGENT_BACKEND") or self._auto_default_backend())
+                        or os.environ.get("HPCPILOT_BACKEND") or self._auto_default_backend())
         default_model = PROVIDER_DEFAULT_MODELS.get(self.backend, "")
         self.model = kwargs.get("model") or self.config.get("model") or os.environ.get("OPENCODE_MODEL", "") or default_model
         self.api_key = kwargs.get("api_key") or self.config.get("api_key") or ""
@@ -174,8 +174,8 @@ class HPCAgent:
         self.reasoning_effort = kwargs.get("effort") or kwargs.get("reasoning_effort") or self.config.get("reasoning_effort") or ""
 
         # Inject configurations into HPC modules
-        import hpcagent.hpc.accounts as hpc_accounts
-        import hpcagent.hpc.nodes as hpc_nodes
+        import hpcpilot.hpc.accounts as hpc_accounts
+        import hpcpilot.hpc.nodes as hpc_nodes
 
         cluster_cfg = self.config.get("cluster") or {}
         commands_cfg = self.config.get("commands") or {}
@@ -994,7 +994,7 @@ class HPCAgent:
                     elif cmd == '/save':
                         filename = args_str
                         if not filename:
-                            default_fn = f"hpcagent_transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+                            default_fn = f"hpcpilot_transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
                             print(f"  {c.YELLOW}Enter filename/path to save transcript (Enter for default: {default_fn}){c.RESET}")
                             ans = self._read_or_back(f"  {c.CYAN}Save Path\u276f {c.RESET}")
                             if ans is None:

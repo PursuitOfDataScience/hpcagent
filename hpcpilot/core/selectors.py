@@ -31,7 +31,7 @@ def interactive_select(options, header="Select option", current_label="", defaul
     only matching options (plus any in ``always_show``) are shown, windowed to
     ``max_visible`` rows. Returns ``_SELECTION_CANCELLED`` on ESC / Ctrl-C.
     """
-    from hpcagent.core.ui import c
+    from hpcpilot.core.ui import c
 
     # Non-TTY fallback
     if not sys.stdin.isatty() or not sys.stdout.isatty():
